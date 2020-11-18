@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" modified="2020-11-18T13:34:55.422Z" agent="5.0 (X11)" etag="hYFxPsVATPEHzhZchqMe" version="13.9.9" type="github">
+<mxfile host="app.diagrams.net" modified="2020-11-18T13:49:40.970Z" agent="5.0 (X11)" etag="9qVSXlrlFvUQdRo2TfIc" version="13.9.9" type="github">
   <diagram id="vSsBbyGpL86iU16PmAUu" name="Page-1">
     <mxGraphModel dx="1152" dy="831" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
@@ -58,7 +58,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="CLwiBIMFmUd81njh_HAW-17" value="Action Vector" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;labelBackgroundColor=none;opacity=70;" vertex="1" parent="1">
-          <mxGeometry x="467" y="270" width="40" height="20" as="geometry" />
+          <mxGeometry x="460" y="305" width="40" height="20" as="geometry" />
         </mxCell>
         <mxCell id="CLwiBIMFmUd81njh_HAW-19" value="State Vector" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;labelBackgroundColor=none;opacity=70;" vertex="1" parent="1">
           <mxGeometry x="620" y="400" width="40" height="20" as="geometry" />
@@ -78,15 +78,31 @@
         <mxCell id="CLwiBIMFmUd81njh_HAW-29" value="Subject to Domain randomization" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="1">
           <mxGeometry x="239" y="565" width="190" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="CLwiBIMFmUd81njh_HAW-30" value="" style="endArrow=classic;dashed=1;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;startArrow=none;startFill=0;endFill=1;" edge="1" parent="1" target="CLwiBIMFmUd81njh_HAW-1">
+        <mxCell id="CLwiBIMFmUd81njh_HAW-31" value="" style="endArrow=classic;html=1;strokeWidth=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" target="CLwiBIMFmUd81njh_HAW-1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="510" y="295" as="sourcePoint" />
             <mxPoint x="440" y="330" as="targetPoint" />
             <Array as="points">
-              <mxPoint x="510" y="220" />
-              <mxPoint x="354" y="220" />
+              <mxPoint x="510" y="240" />
+              <mxPoint x="354" y="240" />
             </Array>
           </mxGeometry>
+        </mxCell>
+        <mxCell id="CLwiBIMFmUd81njh_HAW-32" value="" style="endArrow=classic;html=1;strokeWidth=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" target="CLwiBIMFmUd81njh_HAW-13">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="510" y="290" as="sourcePoint" />
+            <mxPoint x="440" y="330" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="510" y="430" />
+              <mxPoint x="290" y="430" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="CLwiBIMFmUd81njh_HAW-33" value="z⁻¹" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="1">
+          <mxGeometry x="410" y="220" width="30" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="CLwiBIMFmUd81njh_HAW-34" value="Latent space" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="1">
+          <mxGeometry x="230" y="382" width="80" height="20" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
