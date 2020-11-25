@@ -1,0 +1,4 @@
+name: aldr
+channels:
+  - defaults
+prefix: /home/user/anaconda3/envs/aldr
