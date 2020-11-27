@@ -1,0 +1,12 @@
+[submodule "papers/fixed-wing-gym"]
+	path = papers/fixed-wing-gym
+	url = git@github.com:MoritzSchueler96/fixed-wing-gym.git
+[submodule "papers/x8"]
+	path = papers/x8
+	url = git@github.com:MoritzSchueler96/x8.git
+[submodule "papers/pyfly"]
+	path = papers/pyfly
+	url = git@github.com:MoritzSchueler96/pyfly.git
+[submodule "papers/oyster"]
+	path = papers/oyster
+	url = git@github.com:MoritzSchueler96/oyster.git
