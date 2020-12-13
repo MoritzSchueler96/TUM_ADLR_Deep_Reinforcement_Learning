@@ -10,3 +10,6 @@
 [submodule "papers/oyster"]
 	path = papers/oyster
 	url = git@github.com:MoritzSchueler96/oyster.git
+[submodule "papers/stable-baselines"]
+	path = papers/stable-baselines
+	url = git@github.com:MoritzSchueler96/stable-baselines.git
