@@ -26,7 +26,11 @@ First install all related code which is under the "papers" folder
    cd papers/pyfly/
    pip install -e .
 
-3. Oyster
+3. stable baselines
+   cd papers/stable-baselines
+   pip install -e .
+
+4. Oyster
    cd papers/oyster/rand_param-envs
    pip install -e .
 
