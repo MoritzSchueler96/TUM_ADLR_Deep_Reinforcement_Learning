@@ -9,7 +9,7 @@ Create a new environment with the provided env.yml or use the requirements.txt t
 Please use Python version 3.7
 
 1. With env.yml
-   conda env create --file envname.yml
+   conda env create --file env.yml
 2. Using requirements.txt
    Use or activate desired environment
    pip install -r requirements.txt
