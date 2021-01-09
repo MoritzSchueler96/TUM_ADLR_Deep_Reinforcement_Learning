@@ -1,0 +1,32 @@
+
+Todo:
+  ✔ Bis Mi neuschreiben oder komplett übernehmen @done(20-12-05 00:24)
+  ✔ Trajektorien controller Leon fragen @done(20-12-05 00:24)
+  Mo:
+    ☐ Code kommentieren
+    ✔ Code debuggen -> Verständnis erhöhen @done(21-01-08 14:18)
+    ✔ fixed wing gym zusammen mit pyfly zum laufen bringen -> paper ergebnis nachstellen @done(21-01-09 11:48)
+    ☐ Visualisierung von Patrick einbinden
+    ☐ Blockdiagram für Klassen & Methoden Pyfly
+    ✔ Abgleichen wie Pyfly mit Oyster verbinden @done(21-01-08 14:18)
+    ☐ Positionen in Pyfly einbauen
+  
+  Patrick:
+    ✔ Visualisierung fertigstellen
+    ☐ Code kommentieren
+    ☐ Code debuggen -> Verständnis erhöhen
+    ☐ Blockdiagram für Klassen & Methoden Oyster
+    ☐ Oyster paper nachstellen
+    ✔ Abgleichen wie Pyfly mit Oyster verbinden @done(21-01-08 14:18)
+
+  Open:
+    ☐ in Physik von UAVs einlesen
+    ☐ Von Punkt zu Punkt fliegen über verschiedene Config Files -> wenn Ziel erreicht nicht direkt weiterfliegen sondern auf exakten gerade erreichten Zielpunkt zurücksetzen, um randomness zu vermeiden
+    ☐ Trajektorien Controller schreiben -> buch von leon
+    ☐ Nach Messdaten zum Validieren fragen
+    ☐ Sensormodelle bauen
+    ☐ Plots bisschen auseinander ziehen, damit man sie gut lesen kann
+    ✔ maybe pyfly und fixed wing in mehrere files aufteilen? @done(21-01-08 14:18)
+    ☐ oyster mit pyfly verbinden und basic task lernen
+    ☐ in nbdev einarbeiten
+    ☐ Milestone report schreiben + präsi

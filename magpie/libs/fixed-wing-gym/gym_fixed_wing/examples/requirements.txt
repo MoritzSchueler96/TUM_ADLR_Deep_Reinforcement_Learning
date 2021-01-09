@@ -1,0 +1,2 @@
+stable-baselines==2.8
+tensorflow<=1.15
