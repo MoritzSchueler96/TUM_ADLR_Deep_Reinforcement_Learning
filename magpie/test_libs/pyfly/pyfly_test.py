@@ -7,8 +7,7 @@ import os
 startingDir = os.path.dirname(os.path.realpath(__file__))
 print(startingDir)
 os.chdir(startingDir)
-os.chdir("../papers/pyfly/pyfly/")
-
+os.chdir("../../libs/pyfly/pyfly/")
 
 # load object with config and param file
 sim = PyFly("pyfly_config.json", "x8_param.mat")

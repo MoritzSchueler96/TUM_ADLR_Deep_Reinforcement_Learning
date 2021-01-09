@@ -7,7 +7,7 @@ from gym_fixed_wing.fixed_wing import FixedWingAircraft
 startingDir = os.path.dirname(os.path.realpath(__file__))
 print(startingDir)
 os.chdir(startingDir)
-os.chdir("../papers/fixed-wing-gym/gym_fixed_wing/")
+os.chdir("../../libs/fixed-wing-gym/gym_fixed_wing/")
 
 # create environment from config file
 env = FixedWingAircraft(
