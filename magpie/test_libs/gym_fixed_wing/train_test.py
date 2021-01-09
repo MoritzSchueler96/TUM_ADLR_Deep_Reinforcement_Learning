@@ -4,7 +4,7 @@ import os
 startingDir = os.path.dirname(os.path.realpath(__file__))
 print(startingDir)
 os.chdir(startingDir)
-os.chdir("../papers/fixed-wing-gym/gym_fixed_wing/examples/")
+os.chdir("../../libs/fixed-wing-gym/gym_fixed_wing/examples/")
 
 if __name__ == "__main__":
 
