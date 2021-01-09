@@ -296,7 +296,10 @@ def main(
             config_path = env_config_path
         os.makedirs(model_folder)
         os.makedirs(os.path.join(model_folder, "render"))
-        shutil.copy2(config_path, os.path.join(model_folder, "fixed_wing_config.json"))
+        shutil.copy2(
+            os.path.join(config_path, "fixed_wing_config.json"),
+            os.path.join(model_folder, "fixed_wing_config.json"),
+        )
     config_path = os.path.join(model_folder, "fixed_wing_config.json")
 
     env = VecNormalize(
