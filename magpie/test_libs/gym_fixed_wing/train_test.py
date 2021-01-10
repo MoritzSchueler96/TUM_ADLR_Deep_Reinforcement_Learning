@@ -14,5 +14,5 @@ if __name__ == "__main__":
         disable_curriculum=True,
         policy="MLP",
         train_steps=3000000,
-        test_path="test_sets/",
+        test_data_path="test_sets/test_set_wind_none_step20-20-3.npy",
     )

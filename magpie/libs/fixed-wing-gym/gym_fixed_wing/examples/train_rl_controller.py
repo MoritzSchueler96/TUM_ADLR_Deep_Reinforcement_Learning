@@ -245,7 +245,7 @@ def main(
     train_steps=None,
     policy=None,
     disable_curriculum=True,
-    test_path=None,
+    test_data_path=None,
 ):
 
     global last_render, render_check, test_interval, last_save, model_folder, config_path, test_set_path, model, env
@@ -254,7 +254,7 @@ def main(
     last_render = time.time()
     last_save = time.time()
     render_check = {"files": [], "time": time.time()}
-    test_set_path = test_path
+    test_set_path = test_data_path
 
     num_cpu = int(num_envs)
     if policy is None or policy == "MLP":
@@ -372,5 +372,5 @@ if __name__ == "__main__":
         train_steps=args.train_steps,
         policy=args.policy,
         disable_curriculum=args.disable_curriculum,
-        test_path=args.test_set_path,
+        test_data_path=args.test_set_path,
     )
