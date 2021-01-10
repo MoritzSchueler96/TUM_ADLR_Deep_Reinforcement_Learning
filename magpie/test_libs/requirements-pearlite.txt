@@ -1,0 +1,19 @@
+# pearlite
+stable-baselines3[extra]==0.10.0
+numpy==1.19.5
+gym==0.18.0
+matplotlib==3.3.3
+scipy==1.6.0
+torch==1.7.1
+torchvision==0.8.2
+
+# jupyter notebook
+jupyter==1.0
+jupyter-client==5.2.4
+jupyter-core==4.4.0
+notebook==5.7.4
+ipykernel==5.1.0
+ipywidgets==7.4.2
+notebook==5.7.4
+nbformat==4.4.0
+nbconvert==5.4.0

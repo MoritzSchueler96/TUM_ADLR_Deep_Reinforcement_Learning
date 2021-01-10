@@ -5,14 +5,14 @@ Advanced Deep Learning for Robotics project: Evaluation of End-To-End as well as
 # Setup
 
 Clone this repo
-Create a new environment with the provided env.yml or use the requirements.txt to install all needed packages
-Please use Python version 3.5.6
+Create a new environment with the provided env.yml *magpie-env.yml* or use the requirements.txt *requirements-magpie.txt* to install all needed packages
+Please use Python version 3.8.3
 
 1. With env.yml
-   conda env create --file env.yml
+   conda env create --file magpie-env.yml
 2. Using requirements.txt
    Use or activate desired environment
-   pip install -r requirements.txt
+   pip install -r requirements-magpie.txt
 
 # Installation
 
@@ -27,14 +27,8 @@ First install all related code which is under the "magpie/libs" folder
    pip install -e .
 
 3. Pearlite
-   cd magpie/libs/pearlite
-   pip install -e .
+   cd magpie/libs/pearlite/
+   cp -ar . _PATH/TO/YOUR/CONDA/ENV_/lib/python3.8/site-packages/stable_baselines3
 
-To install locally, you will need to first install [MuJoCo](https://www.roboti.us/index.html)
-For the task distributions in which the reward function varies (Cheetah, Ant, Humanoid), install MuJoCo200.
-Set `LD_LIBRARY_PATH` to point to both the MuJoCo binaries (`/$HOME/.mujoco/mujoco200/bin`) as well as the gpu drivers (something like `/usr/lib/nvidia-390`, you can find your version by running `nvidia-smi`).
-
-For the task distributions where different tasks correspond to different model parameters (Walker and Hopper), MuJoCo131 is required. Simply install it the same way as MuJoCo200.
-These environments make use of the module `rand_param_envs` which is submoduled in this repository.
-Add the module to your python path, `export PYTHONPATH=./rand_param_envs:$PYTHONPATH`
-(Check out [direnv](https://direnv.net/) for handy directory-dependent path managenement.)
+    for example:
+    cp -ar . /home/user/miniconda3/envs/magpie/lib/python3.8/site-packages/stable_baselines3

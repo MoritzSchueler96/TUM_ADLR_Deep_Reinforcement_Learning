@@ -9,7 +9,8 @@ scipy
 click==7.0
 joblib==0.9.4
 python-dateutil==2.6.1
-# adlr
+
+# jupyter notebook
 jupyter==1.0
 jupyter-client==5.2.4
 jupyter-core==4.4.0
