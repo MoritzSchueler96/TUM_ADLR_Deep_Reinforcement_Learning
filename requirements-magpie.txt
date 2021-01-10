@@ -6,6 +6,7 @@ matplotlib==3.3.3
 scipy==1.6.0
 torch==1.7.1
 torchvision==0.8.2
+tqdm==4.55.2
 
 # jupyter notebook
 jupyter==1.0

@@ -19,4 +19,4 @@ Install pearlite code which is under the "magpie/libs" folder
    cp -ar . _PATH/TO/YOUR/CONDA/ENV_/lib/python3.8/site-packages/stable_baselines3
 
     for example:
-    cp -ar . /home/user/miniconda3/envs/magpie/lib/python3.8/site-packages/stable_baselines3
+    cp -ar . /home/user/miniconda3/envs/pearlite/lib/python3.8/site-packages/stable_baselines3
