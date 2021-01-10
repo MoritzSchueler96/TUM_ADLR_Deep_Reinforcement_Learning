@@ -245,15 +245,16 @@ def main(
     train_steps=None,
     policy=None,
     disable_curriculum=True,
-    test_path=None,
+    test_data_path=None,
 ):
 
     global last_render, render_check, test_interval, last_save, model_folder, config_path, test_set_path, model, env
-    # global info_kw, curriculum_level
+    global info_kw, curriculum_level
+
     last_render = time.time()
     last_save = time.time()
     render_check = {"files": [], "time": time.time()}
-    test_set_path = test_path
+    test_set_path = test_data_path
 
     num_cpu = int(num_envs)
     if policy is None or policy == "MLP":
@@ -291,12 +292,15 @@ def main(
     else:
         load = False
         if env_config_path is None:
-            config_path = "fixed_wing_config.json"
+            config_path = ""
         else:
             config_path = env_config_path
         os.makedirs(model_folder)
         os.makedirs(os.path.join(model_folder, "render"))
-        shutil.copy2(config_path, os.path.join(model_folder, "fixed_wing_config.json"))
+        shutil.copy2(
+            os.path.join(config_path, "fixed_wing_config.json"),
+            os.path.join(model_folder, "fixed_wing_config.json"),
+        )
     config_path = os.path.join(model_folder, "fixed_wing_config.json")
 
     env = VecNormalize(
@@ -368,5 +372,5 @@ if __name__ == "__main__":
         train_steps=args.train_steps,
         policy=args.policy,
         disable_curriculum=args.disable_curriculum,
-        test_path=args.test_set_path,
+        test_data_path=args.test_set_path,
     )
