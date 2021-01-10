@@ -4,7 +4,7 @@ Advanced Deep Learning for Robotics project: Evaluation of End-To-End as well as
 
 # Setup
 
-Clone this repo with the option --recurse-submodules
+Clone this repo
 Create a new environment with the provided env.yml or use the requirements.txt to install all needed packages
 Please use Python version 3.5.6
 
