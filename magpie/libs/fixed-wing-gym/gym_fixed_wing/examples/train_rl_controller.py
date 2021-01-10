@@ -249,7 +249,8 @@ def main(
 ):
 
     global last_render, render_check, test_interval, last_save, model_folder, config_path, test_set_path, model, env
-    # global info_kw, curriculum_level
+    global info_kw, curriculum_level
+
     last_render = time.time()
     last_save = time.time()
     render_check = {"files": [], "time": time.time()}
@@ -291,7 +292,7 @@ def main(
     else:
         load = False
         if env_config_path is None:
-            config_path = "fixed_wing_config.json"
+            config_path = ""
         else:
             config_path = env_config_path
         os.makedirs(model_folder)
