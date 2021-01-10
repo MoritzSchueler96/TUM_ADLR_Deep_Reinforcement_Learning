@@ -61,7 +61,7 @@ def evaluate_model_on_set(
     metrics=("success", "control_variation", "rise_time", "overshoot", "settling_time"),
     norm_data_path=None,
     num_envs=1,
-    turbulence_intensity="none",
+    turbulence_intensity="None",
     use_pid=False,
     writer=None,
     timestep=None,
