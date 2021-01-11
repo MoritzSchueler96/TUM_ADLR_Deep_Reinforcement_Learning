@@ -3,12 +3,14 @@ import gym
 from pyfly.pid_controller import PIDController
 import os
 from gym_fixed_wing.fixed_wing import FixedWingAircraft
+from pyfly_fixed_wing_visualizer.pyfly_fixed_wing_visualizer import simrecorder
 
 startingDir = os.path.dirname(os.path.realpath(__file__))
 print(startingDir)
 os.chdir(startingDir)
 os.chdir("../../libs/fixed-wing-gym/gym_fixed_wing/")
 
+rec = simrecorder(1000)
 # create environment from config file
 env = FixedWingAircraft(
     "fixed_wing_config.json",
@@ -16,6 +18,9 @@ env = FixedWingAircraft(
         "steps_max": 1000,
         "observation": {"noise": {"mean": 0, "var": 0}},
         "action": {"scale_space": False},
+    },
+    sim_config_kw={
+        "recorder": rec,
     },
 )
 # set seed to be able to repeat results
