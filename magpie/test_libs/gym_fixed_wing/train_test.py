@@ -13,6 +13,6 @@ if __name__ == "__main__":
         num_envs=4,
         disable_curriculum=True,
         policy="MLP",
-        train_steps=3000000,
+        train_steps=5000000,
         test_data_path="test_sets/test_set_wind_none_step20-20-3.npy",
     )
