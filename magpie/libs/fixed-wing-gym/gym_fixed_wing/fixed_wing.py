@@ -500,6 +500,12 @@ class FixedWingAircraft(gym.Env):
             resample_target = False
             goal_achieved_on_step = False
 
+            # save current state for visualization with pyfly fixed wing visualizer
+            if self.simulator.rec:
+                self.simulator.rec.savestate(
+                    self.simulator.state, self.simulator.cur_sim_step - 1
+                )
+
             # if a goal is set:
             # add goal status to history and check if goal reached
             # then set a new goal, no goal or end the sim
