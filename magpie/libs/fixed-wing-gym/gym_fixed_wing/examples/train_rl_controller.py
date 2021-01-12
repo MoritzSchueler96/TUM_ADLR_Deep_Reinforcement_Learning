@@ -285,8 +285,7 @@ def main(
     else:
         training_steps = int(5e6)
 
-    rec = simrecorder(train_steps)
-    sim_config_kw.update({"recorder": rec})
+    # sim_config_kw.update({"recorder": simrecorder(training_steps)})
 
     test_interval = int(
         training_steps / 5
@@ -337,7 +336,7 @@ def main(
         callback=monitor_training,
     )
     save_model(model, model_folder)
-    # env.env_method("render", block=True) # doens't work -> interaction with stable baseline?
+    # env.env_method("render", mode="plot", show=True, close=False)  # doesnt do anything?
 
 
 if __name__ == "__main__":

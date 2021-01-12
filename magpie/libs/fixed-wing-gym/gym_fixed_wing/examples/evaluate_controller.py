@@ -107,8 +107,7 @@ def evaluate_model_on_set(
         "turbulence_intensity": turbulence_intensity,
     }
 
-    rec = simrecorder(1500)
-    sim_config_kw.update({"recorder": rec})
+    # sim_config_kw.update({"recorder": simrecorder(1500)})
 
     test_env = SubprocVecEnv(
         [
@@ -171,7 +170,7 @@ def evaluate_model_on_set(
                         )
                         scenario = scenarios.pop(0)
                         env_scen_i[i] = (scenario_count - 1) - len(scenarios)
-                        # test_env.env_method("render", block=True) #not working because rendering after reset doesnt work
+                        # test_env.env_method("render", indices=0, mode="plot", show=True, close=False)
                         obs[i] = test_env.env_method("reset", indices=i, **scenario)[0]
                         if use_pid:
                             model[i].reset()
