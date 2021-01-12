@@ -20,6 +20,8 @@ from PIL import Image
 import shutil
 import matplotlib.pyplot as plt
 
+from pyfly_fixed_wing_visualizer.pyfly_fixed_wing_visualizer import simrecorder
+
 try:
     from evaluate_controller import evaluate_model_on_set
 except:
@@ -47,6 +49,7 @@ info_kw = [
     "total_error",
     "success_time_frac",
 ]
+sim_config_kw = {}
 env = None
 model = None
 model_folder = None
@@ -249,7 +252,7 @@ def main(
 ):
 
     global last_render, render_check, test_interval, last_save, model_folder, config_path, test_set_path, model, env
-    global info_kw, curriculum_level
+    global info_kw, curriculum_level, sim_config_kw
 
     last_render = time.time()
     last_save = time.time()
@@ -282,6 +285,9 @@ def main(
     else:
         training_steps = int(5e6)
 
+    rec = simrecorder(train_steps)
+    sim_config_kw.update({"recorder": rec})
+
     test_interval = int(
         training_steps / 5
     )  # How often in time steps during training the model is evaluated on the test set
@@ -305,7 +311,10 @@ def main(
 
     env = VecNormalize(
         SubprocVecEnv(
-            [make_env(config_path, i, info_kw=info_kw) for i in range(num_cpu)]
+            [
+                make_env(config_path, i, info_kw=info_kw, sim_config_kw=sim_config_kw)
+                for i in range(num_cpu)
+            ]
         )
     )
     env.env_method("set_curriculum_level", curriculum_level)
@@ -328,6 +337,7 @@ def main(
         callback=monitor_training,
     )
     save_model(model, model_folder)
+    # env.env_method("render", block=True) # doens't work -> interaction with stable baseline?
 
 
 if __name__ == "__main__":

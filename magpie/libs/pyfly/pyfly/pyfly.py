@@ -1243,6 +1243,10 @@ class PyFly:
 
         self.cur_sim_step = None
         self.viewer = None
+        if "recorder" in self.cfg:
+            self.rec = self.cfg.pop("recorder")
+        else:
+            self.rec = None
 
     def seed(self, seed=None):
         """
@@ -1255,13 +1259,15 @@ class PyFly:
 
         self.wind.seed(seed)
 
-    def reset(self, state=None, turbulence_noise=None):  # TODO: recursive function?
+    def reset(self, state=None, turbulence_noise=None):
         """
         Reset state of simulator. Must be called before first use.
         :param state: (dict) set initial value of states to given value.
         """
         # used
         self.cur_sim_step = 0
+        if self.rec:
+            self.rec.reset(self.cfg["turbulence_sim_length"])
 
         # reset variables except actual state, wind, energy and control variables
         for name, var in self.state.items():
@@ -1335,6 +1341,9 @@ class PyFly:
                     )
                 else:
                     p.plot(fig=sub_fig)
+
+            if self.rec:
+                self.rec.plot()
 
             if viewer is None:
                 plt.show(block=block)

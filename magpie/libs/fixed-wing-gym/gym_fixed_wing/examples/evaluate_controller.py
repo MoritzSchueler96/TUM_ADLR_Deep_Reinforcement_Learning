@@ -4,6 +4,7 @@ from stable_baselines.common import set_global_seeds
 from stable_baselines import PPO2
 from gym_fixed_wing.fixed_wing import FixedWingAircraft
 from pyfly.pid_controller import PIDController
+from pyfly_fixed_wing_visualizer.pyfly_fixed_wing_visualizer import simrecorder
 import tensorflow as tf
 import os
 import numpy as np
@@ -106,12 +107,16 @@ def evaluate_model_on_set(
         "turbulence_intensity": turbulence_intensity,
     }
 
+    rec = simrecorder(1500)
+    sim_config_kw.update({"recorder": rec})
+
     test_env = SubprocVecEnv(
         [
             make_env(config_path, i, config_kw=config_kw, sim_config_kw=sim_config_kw)
             for i in range(num_envs)
         ]
     )
+
     if use_pid:
         dt = test_env.get_attr("simulator")[0].dt
         for pid in model:
@@ -166,6 +171,7 @@ def evaluate_model_on_set(
                         )
                         scenario = scenarios.pop(0)
                         env_scen_i[i] = (scenario_count - 1) - len(scenarios)
+                        # test_env.env_method("render", block=True) #not working because rendering after reset doesnt work
                         obs[i] = test_env.env_method("reset", indices=i, **scenario)[0]
                         if use_pid:
                             model[i].reset()
