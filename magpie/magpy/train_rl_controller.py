@@ -69,7 +69,7 @@ def save_model(model, save_folder):
     :return:
     """
     model.save(os.path.join(save_folder, "model.pkl"))
-    model.env.save(save_folder)
+    model.env.save(os.path.join(save_folder, "env.pkl"))
 
 
 class TensorboardCallback(BaseCallback):

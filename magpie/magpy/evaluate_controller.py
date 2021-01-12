@@ -150,7 +150,7 @@ def evaluate_model_on_set(
             test_env.ret_rms = model.env.ret_rms
         else:
             assert norm_data_path is not None
-            test_env.load(norm_data_path)
+            model.env = test_env.load(os.path.join(norm_data_path, "env.pkl"), test_env)
         test_env.training = False
 
     res = {metric: {} for metric in metrics}
@@ -262,11 +262,11 @@ def main(
         assert model_path is not None
         model_path = model_path
         if "mSAC" in model_path:
-            model = mSAC.load(load_path=model_path)
+            model = mSAC.load(path=model_path)
         elif "SAC" in model_path:
-            model = SAC.load(load_path=model_path)
+            model = SAC.load(path=model_path)
         else:
-            model = PPO.load(load_path=model_path)
+            model = PPO.load(path=model_path)
 
         config_path = os.path.join(
             os.path.dirname(model_path), "fixed_wing_config.json"

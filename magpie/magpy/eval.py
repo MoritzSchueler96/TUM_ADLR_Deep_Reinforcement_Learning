@@ -12,7 +12,7 @@ print(examplesDir)
 if __name__ == "__main__":
     main(
         path_to_file=examplesDir + "test_sets/test_set_wind_moderate_step20-20-3.npy",
-        num_envs=1,
+        num_envs=4,
         model_path="models/test3/model.pkl",
         turbulence_intensity="moderate",
         print_res=False,
