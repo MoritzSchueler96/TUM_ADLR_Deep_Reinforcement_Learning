@@ -131,5 +131,4 @@ dmypy.json
 # Additional stuff
 .vscode
 .metals
-/magpie/prepare/
 
