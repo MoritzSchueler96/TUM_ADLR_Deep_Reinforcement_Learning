@@ -21,11 +21,11 @@ print(res)
 if __name__ == "__main__":
 
     main(
-        model_name="test3",
+        model_name="test1",
         num_envs=4,
         env_config_path=startingDir,
         disable_curriculum=True,
         policy="MlpPolicy",
-        train_steps=5000,
+        train_steps=3000000,
         test_data_path=examplesDir + "test_sets/test_set_wind_none_step20-20-3.npy",
     )
