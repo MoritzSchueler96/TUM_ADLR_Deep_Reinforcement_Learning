@@ -365,6 +365,7 @@ def main(
             )
     model.learn(
         total_timesteps=training_steps,
+        log_interval=log_interval,
         callback=TensorboardCallback(),
     )
     save_model(model, model_folder)
