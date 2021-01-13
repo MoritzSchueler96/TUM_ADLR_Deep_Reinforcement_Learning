@@ -112,6 +112,9 @@ def evaluate_meta_policy(
 
     episode_rewards, episode_lengths = [], []
     reward = []
+    replay_buffer.reset()
+    model.actor.clear_z()
+    
     for i in range(n_eval_episodes):
         # Avoid double reset, as VecEnv are reset automatically
         if not isinstance(env, VecEnv) or i == 0:
@@ -120,13 +123,21 @@ def evaluate_meta_policy(
         done, state = False, None
         episode_reward = 0.0
         episode_length = 0
+        model.actor.clear_z()
         while not done:
             with th.no_grad():
 
-                if replay_buffer.pos > 999:
-                    #print('z schould change')
-                    context = model.actor.sample_context(replay_buffer)
-                    #print(replay_buffer.observations.shape)
+                if replay_buffer.pos > 15*200:
+               
+        
+                    indices = replay_buffer.pos % 200
+                    sample_pos = np.random.randint(100, size=(1))
+            
+                    context = th.zeros(1,27)
+                    sample = replay_buffer._get_samples((indices+1)*200-sample_pos)
+
+                    context = th.cat([sample.observations,sample.actions,sample.rewards], dim=1)
+                  
                     model.actor.infer_posterior(context)
                     
                     model.actor.sample_z()

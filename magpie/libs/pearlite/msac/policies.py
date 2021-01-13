@@ -104,7 +104,8 @@ class Actor(BasePolicy):
         
         # create context encoder network
         reward_dim = 1
-        context_encoder_input_dim = 2*features_dim + action_dim + reward_dim
+        #context_encoder_input_dim = 2*features_dim + action_dim + reward_dim
+        context_encoder_input_dim = features_dim + action_dim + reward_dim
         self.context_encoder_output_dim = latent_dim * 2
         context_encoder = create_mlp(input_dim = context_encoder_input_dim, output_dim = self.context_encoder_output_dim, net_arch = hidden_sizes, activation_fn = nn.ReLU)
         self.context_encoder = nn.Sequential(*context_encoder).to(self.device)
@@ -135,17 +136,19 @@ class Actor(BasePolicy):
             self.log_std = nn.Linear(last_layer_dim, action_dim)
             
         self.z_means = th.zeros(latent_dim)
-        self.z_vars = th.zeros(latent_dim)
+        self.z_vars = th.ones(latent_dim)
         self.z = th.zeros(latent_dim)
-    def clear_z(self, num_tasks=1):
+        
+        
+    def clear_z(self):
         '''
         reset q(z|c) to the prior
         sample a new z from the prior
         '''
         # reset distribution over z to the prior
-        mu = ptu.zeros(num_tasks, self.latent_dim)
+        mu = th.zeros(self.latent_dim)
         
-        var = ptu.ones(num_tasks, self.latent_dim)
+        var = th.ones(self.latent_dim)
 
         self.z_means = mu
         self.z_vars = var
@@ -153,7 +156,7 @@ class Actor(BasePolicy):
         self.sample_z()
         # reset the context collected so far
         self.context = None
-
+#        print('z cleared')
 
     def sample_z(self):
         
@@ -177,7 +180,7 @@ class Actor(BasePolicy):
     def infer_posterior(self, context):
         ''' compute q(z|c) as a function of input context and sample new z from it'''
         params = self.context_encoder(context)
-        params = params.view(-1,context.size(0), self.context_encoder_output_dim)
+        params = params.view(context.size(0), -1, 10)
         # with probabilistic z, predict mean and variance of q(z | c)
        
         mu = params[..., :self.latent_dim]
@@ -188,25 +191,7 @@ class Actor(BasePolicy):
         
         self.sample_z()
         
-    def sample_context(self, replay_buffer, leaveout: int = 0):
-        ''' sample batch of context from a list of tasks from the replay buffer '''
-        # make method work given a single task index
-        #if not hasattr(indices, '__iter__'):
-        #    indices = [indices]
-            
-        # Draw randomly 100 transitions only from the last 1000 transitions
-        indices = np.random.randint(999, size=(100))
-        indices = replay_buffer.pos - indices -leaveout       
-        batches = replay_buffer._get_samples(indices)
-        
-        # full context consists of [obs, act, rewards, next_obs, terms]
-        # if dynamics don't change across tasks, don't include next_obs
-        # don't include terminals in context
-		
-        context = th.cat([batches.observations, batches.actions, batches.next_observations, batches.rewards], dim =1)
-        
-        return context
-        
+       
 
     def _get_data(self) -> Dict[str, Any]:
         data = super()._get_data()
@@ -265,12 +250,11 @@ class Actor(BasePolicy):
             #features = features.flatten()
         if len(z.shape) == 1:
             z = z.reshape(1, self.latent_dim)
+
         #if int(z.shape[0]) == 1 and int(z.shape[1]) == self.latent_dim:
             #z = z.flatten()
 
-#        print('features:', features.shape)
-#        print('z:',  z)
-
+        
         features = th.cat([features, z], dim=1)
 #        print('combined features:', features.shape)
         latent_pi = self.latent_pi(features)
