@@ -14,17 +14,14 @@ from stable_baselines3 import SAC
 from stable_baselines3 import mSAC
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
-
-# from stable_baselines3.common.logger import Image # gibts nicht?!
+from stable_baselines3.common.logger import Image
 
 from gym_fixed_wing.fixed_wing import FixedWingAircraft
 from pyfly_fixed_wing_visualizer.pyfly_fixed_wing_visualizer import simrecorder
 import time
 import os
-import io
 import shutil
 import matplotlib.pyplot as plt
-from PIL import Image
 
 try:
     from evaluate_controller import evaluate_model_on_set
@@ -171,63 +168,20 @@ class TensorboardCallback(BaseCallback):
                     if render_file not in render_check["files"]:
                         render_check["files"].append(render_file)
 
-                        img = object_to_summary_image(
+                        img = plt.imread(
                             os.path.join(*[model_folder, "render", render_file])
                         )
-                        try:
-                            self.logger.record(
-                                "render/image",
-                                Image.open(img, "HWC"),
-                                exclude=("stdout", "log", "json", "csv"),
-                            )
-                        except:
-                            print("Du")
+                        self.logger.record(
+                            "pyfly/image",
+                            Image(img, "HWC"),
+                            exclude=("stdout", "log", "json", "csv"),
+                        )
 
             if now - last_save >= checkpoint_save_interval:
                 save_model(self.model, model_folder)
                 last_save = now
 
         return True
-
-
-def object_to_summary_image(object):
-    """
-    Helper function to convert an image object or matplotlib figure to a tensorboard summary image.
-    :param object: (matplotlib figure) The object to be converted
-    :return: tensorboard summary Image
-    """
-    buf = io.BytesIO()
-    if isinstance(object, str):
-        img = Image.open(object)
-        height, width = img.size
-        channels = len(img.getbands())
-        img.save(buf, format="PNG")
-    else:
-        height, width = object.get_size_inches() * object.dpi
-        channels = 4
-        object.savefig(buf, format="png")
-        # Closing the object prevents it from being displayed directly inside
-        # the notebook.
-        plt.close(object)
-    buf.seek(0)
-    image_string = buf.getvalue()
-    buf.close()
-    """
-    return tf.Summary.Image(
-        height=int(height),
-        width=int(width),
-        colorspace=channels,
-        encoded_image_string=image_string,
-    )
-    
-    return torch.utils.tensorboard.SummaryWriter().add_image(
-        height=int(height),
-        width=int(width),
-        colorspace=channels,
-        encoded_image_string=image_string,
-    )
-    """
-    return 1
 
 
 def make_env(config_path, rank, seed=0, info_kw=None, sim_config_kw=None):
@@ -283,7 +237,7 @@ def main(
     # sim_config_kw.update({"recorder": simrecorder(train_steps)})
 
     test_interval = int(
-        training_steps / 5 * 5
+        training_steps / 5
     )  # How often in time steps during training the model is evaluated on the test set
 
     model_folder = os.path.join("models", model_name)
@@ -353,7 +307,6 @@ def main(
                 policy,
                 env,
                 verbose=1,
-                buffer_size=1000,
                 tensorboard_log=os.path.join(model_folder, "tb"),
             )
         else:
