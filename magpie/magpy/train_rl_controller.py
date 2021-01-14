@@ -115,7 +115,8 @@ class TensorboardCallback(BaseCallback):
                                 value=np.nanmean(v),
                             )
             elif (
-                self.locals["update"] % log_interval == 0 and self.locals["update"] != 0
+                self.locals["n_steps"] % log_interval == 0
+                and self.locals["n_steps"] != 0
             ):
                 for info_k, info_v in info.items():
                     print(
@@ -237,7 +238,7 @@ def main(
     # sim_config_kw.update({"recorder": simrecorder(train_steps)})
 
     test_interval = int(
-        training_steps / 5
+        training_steps / 5 * 5
     )  # How often in time steps during training the model is evaluated on the test set
 
     model_folder = os.path.join("models", model_name)
