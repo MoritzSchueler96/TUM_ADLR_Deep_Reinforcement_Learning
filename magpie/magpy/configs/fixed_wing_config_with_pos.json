@@ -36,6 +36,14 @@
         "type": "state",
         "mean": 21,
         "var": 2
+      },   
+      {
+        "name": "position_d",
+        "low": 0,
+        "high": 10000,
+        "type": "state",
+        "mean": 210,
+        "var": 2
       },
       {
         "name": "omega_p",
@@ -84,6 +92,13 @@
         "value": "absolute",
         "mean": 0,
         "var": 2
+      },
+      {
+        "name": "position_d",
+        "type": "target",
+        "value": "absolute",
+        "mean": 0,
+        "var": 20
       },
       {
         "name": "alpha",
@@ -171,6 +186,14 @@
         "delta": 6,
         "class": "compensate",
         "bound": 2
+      },
+      {
+        "name": "position_d",
+        "low": 1000,
+        "high": 1100,
+        "delta": 200,
+        "class": "constant",
+        "bound": 5
       }
     ]
   },
@@ -211,6 +234,16 @@
         "type": "error",
         "function_class": "linear",
         "scaling": 25,
+        "shaping": true,
+        "max": 0.3,
+        "sign": -1
+      },
+      {
+        "name": "position_d",
+        "class": "state",
+        "type": "error",
+        "function_class": "linear",
+        "scaling": 30,
         "shaping": true,
         "max": 0.3,
         "sign": -1
@@ -268,6 +301,12 @@
       {
         "name": "Va",
         "constraint_max": 70
+      },
+      {
+        "name": "position_d",
+        "init_min": 200,
+        "init_max": 300,
+        "constraint_max": 20000
       },
       {
         "name": "omega_p",

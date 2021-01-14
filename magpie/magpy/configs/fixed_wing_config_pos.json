@@ -10,31 +10,13 @@
       "mean": 0,
       "var": 0
     },
-    "states": [
+    "states": [ 
       {
-        "name": "roll",
-        "low": -180,
-        "high": 180,
-        "convert_to_radians": true,
-        "type": "state",
-        "mean": 0,
-        "var": 0.3
-      },
-      {
-        "name": "pitch",
-        "low": -85,
-        "high": 85,
-        "convert_to_radians": true,
-        "type": "state",
-        "mean": 0,
-        "var": 0.15
-      },
-      {
-        "name": "Va",
+        "name": "position_d",
         "low": 0,
-        "high": 70,
+        "high": 1000,
         "type": "state",
-        "mean": 21,
+        "mean": 210,
         "var": 2
       },
       {
@@ -65,25 +47,11 @@
         "var": 0.94
       },
       {
-        "name": "roll",
+        "name": "position_d",
         "type": "target",
         "value": "absolute",
         "mean": 0,
-        "var": 0.16
-      },
-      {
-        "name": "pitch",
-        "type": "target",
-        "value": "absolute",
-        "mean": 0,
-        "var": 0.05
-      },
-      {
-        "name": "Va",
-        "type": "target",
-        "value": "absolute",
-        "mean": 0,
-        "var": 2
+        "var": 20
       },
       {
         "name": "alpha",
@@ -147,29 +115,11 @@
     "on_success": "none",
     "states": [
       {
-        "name": "roll",
-        "convert_to_radians": true,
-        "low": -60,
-        "high": 60,
-        "delta": 180,
+        "name": "position_d",
+        "low": 400,
+        "high": 500,
+        "delta": 50,
         "class": "constant",
-        "bound": 5
-      },
-      {
-        "name": "pitch",
-        "convert_to_radians": true,
-        "low": -25,
-        "high": 25,
-        "delta": 45,
-        "class": "constant",
-        "bound": 5
-      },
-      {
-        "name": "Va",
-        "low": 15,
-        "high": 28,
-        "delta": 6,
-        "class": "compensate",
         "bound": 2
       }
     ]
@@ -186,27 +136,7 @@
     ],
     "factors": [
       {
-        "name": "roll",
-        "class": "state",
-        "type": "error",
-        "function_class": "linear",
-        "scaling": 3.2,
-        "shaping": true,
-        "max": 0.3,
-        "sign": -1
-      },
-      {
-        "name": "pitch",
-        "class": "state",
-        "type": "error",
-        "function_class": "linear",
-        "scaling": 3.2,
-        "shaping": true,
-        "max": 0.3,
-        "sign": -1
-      },
-      {
-        "name": "Va",
+        "name": "position_d",
         "class": "state",
         "type": "error",
         "function_class": "linear",
@@ -239,18 +169,6 @@
   "simulator": {
     "states": [
       {
-        "name": "roll",
-        "init_min": -110,
-        "init_max": 110,
-        "convert_to_radians": true
-      },
-      {
-        "name": "pitch",
-        "init_min": -45,
-        "init_max": 45,
-        "convert_to_radians": true
-      },
-      {
         "name": "velocity_u",
         "init_min": 10,
         "init_max": 23
@@ -266,8 +184,10 @@
         "init_max": 5
       },
       {
-        "name": "Va",
-        "constraint_max": 70
+        "name": "position_d",
+        "init_min": 200,
+        "init_max": 300,
+        "constraint_max": 1000
       },
       {
         "name": "omega_p",
