@@ -213,7 +213,7 @@ def main(
     num_envs,
     env_config_path=None,
     train_steps=None,
-    policy="MlpPolicy",
+    policy=None,
     disable_curriculum=True,
     test_data_path=None,
 ):
@@ -227,6 +227,10 @@ def main(
     test_set_path = test_data_path
 
     num_cpu = int(num_envs)
+
+    if policy is None:
+        policy = "MlpPolicy"
+
     if disable_curriculum:
         curriculum_level = 1
 
@@ -335,7 +339,8 @@ if __name__ == "__main__":
         "model_name",
         help="Path to model folder. If already exists, configurations will be loaded from this folder and training will resume from checkpoint.",
     )
-    parser.add_argument("num-envs", help="Number of processes for environments.")
+    parser.add_argument("num_envs", help="Number of processes for environments.")
+
     parser.add_argument(
         "--env-config-path",
         required=False,
@@ -345,7 +350,7 @@ if __name__ == "__main__":
         "--train-steps", required=False, help="Number of training time steps"
     )
     parser.add_argument(
-        "--policy", required=False, help="Type of policy to use (MLP or CNN)"
+        "--policy", required=False, help="Type of policy to use (MlpPolicy or other)"
     )
     parser.add_argument(
         "--disable-curriculum",
@@ -361,6 +366,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    print(args)
 
     main(
         model_name=args.model_name,
