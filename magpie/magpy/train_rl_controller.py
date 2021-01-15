@@ -132,7 +132,7 @@ class TensorboardCallback(BaseCallback):
                 if curriculum_cooldown <= 0:
                     if np.mean(info["success"]["all"]) > curriculum_level:
                         curriculum_level = min(np.mean(info["success"]["all"]) * 2, 1)
-                        env.set_curriculum_level(curriculum_level)
+                        env.env_method("set_curriculum_level", curriculum_level)
                         curriculum_cooldown = 15
                 else:
                     curriculum_cooldown -= 1
@@ -366,7 +366,6 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    print(args)
 
     main(
         model_name=args.model_name,
