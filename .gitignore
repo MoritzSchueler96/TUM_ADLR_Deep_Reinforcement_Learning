@@ -131,4 +131,4 @@ dmypy.json
 # Additional stuff
 .vscode
 .metals
-
+magpie/libs/fixed-wing-gym/gym_fixed_wing/examples/models/rep/tb
