@@ -36,7 +36,6 @@ class Monitor(gym.Wrapper):
         reset_keywords: Tuple[str, ...] = (),
         info_keywords: Tuple[str, ...] = (),
     ):
-        #Wrapper.__init__(self, env=env)
         super(Monitor, self).__init__(env=env)
         self.t_start = time.time()
         if filename is None:

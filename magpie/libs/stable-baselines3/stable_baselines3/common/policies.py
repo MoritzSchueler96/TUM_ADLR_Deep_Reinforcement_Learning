@@ -286,6 +286,8 @@ class BasePolicy(BaseModel):
         with th.no_grad():
             actions = self._predict(observation, deterministic=deterministic)
         # Convert to numpy
+        
+        
         actions = actions.cpu().numpy()
 
         if isinstance(self.action_space, gym.spaces.Box):
@@ -298,10 +300,10 @@ class BasePolicy(BaseModel):
                 actions = np.clip(actions, self.action_space.low, self.action_space.high)
 
         if not vectorized_env:
-            if state is not None:
-                raise ValueError("Error: The environment must be vectorized when using recurrent policies.")
+#            if state is not None:
+#                raise ValueError("Error: The environment must be vectorized when using recurrent policies.")
             actions = actions[0]
-
+        
         return actions, state
 
     def scale_action(self, action: np.ndarray) -> np.ndarray:
@@ -751,6 +753,7 @@ class ContinuousCritic(BaseModel):
         self.n_critics = n_critics
         self.q_networks = []
         for idx in range(n_critics):
+            print('critic with ', features_dim + action_dim)
             q_net = create_mlp(features_dim + action_dim, 1, net_arch, activation_fn)
             q_net = nn.Sequential(*q_net)
             self.add_module(f"qf{idx}", q_net)

@@ -1,14 +1,12 @@
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import gym
 import torch as th
 from torch import nn
-import torch.nn.functional as F
-import numpy as np
 
 from stable_baselines3.common.distributions import SquashedDiagGaussianDistribution, StateDependentNoiseDistribution
 from stable_baselines3.common.policies import BasePolicy, ContinuousCritic, create_sde_features_extractor, register_policy
-from stable_baselines3.common.preprocessing import get_action_dim
+from stable_baselines3.common.preprocessing import get_action_dim, get_flattened_obs_dim
 from stable_baselines3.common.torch_layers import (
     BaseFeaturesExtractor,
     FlattenExtractor,
@@ -16,19 +14,12 @@ from stable_baselines3.common.torch_layers import (
     create_mlp,
     get_actor_critic_arch,
 )
+from stable_baselines3.common.type_aliases import Schedule
 
 # CAP the standard deviation of the actor
 LOG_STD_MAX = 2
 LOG_STD_MIN = -20
 
-def _product_of_gaussians(mus, sigmas_squared):
-    '''
-    compute mu, sigma of product of gaussians
-    '''
-    sigmas_squared = th.clamp(sigmas_squared, min=1e-7)
-    sigma_squared = 1. / th.sum(th.reciprocal(sigmas_squared), dim=0)
-    mu = sigma_squared * th.sum(mus / sigmas_squared, dim=0)
-    return mu, sigma_squared
 
 class Actor(BasePolicy):
     """
@@ -63,8 +54,6 @@ class Actor(BasePolicy):
         net_arch: List[int],
         features_extractor: nn.Module,
         features_dim: int,
-        latent_dim: int,
-        hidden_sizes: List[int] = [200, 200, 200],
         activation_fn: Type[nn.Module] = nn.ReLU,
         use_sde: bool = False,
         log_std_init: float = -3,
@@ -94,23 +83,11 @@ class Actor(BasePolicy):
         self.use_expln = use_expln
         self.full_std = full_std
         self.clip_mean = clip_mean
-        
-        self.latent_dim = latent_dim
-        self.observation_space = observation_space
+
         action_dim = get_action_dim(self.action_space)
-        latent_pi_net = create_mlp(features_dim+latent_dim, -1, net_arch, activation_fn)
+        latent_pi_net = create_mlp(features_dim, -1, net_arch, activation_fn)
         self.latent_pi = nn.Sequential(*latent_pi_net)
         last_layer_dim = net_arch[-1] if len(net_arch) > 0 else features_dim
-        
-        # create context encoder network
-        reward_dim = 1
-        #context_encoder_input_dim = 2*features_dim + action_dim + reward_dim
-        context_encoder_input_dim = features_dim + action_dim + reward_dim
-        self.context_encoder_output_dim = latent_dim * 2
-        context_encoder = create_mlp(input_dim = context_encoder_input_dim, output_dim = self.context_encoder_output_dim, net_arch = hidden_sizes, activation_fn = nn.ReLU)
-        self.context_encoder = nn.Sequential(*context_encoder).to(self.device)
-        self.latent_dim = latent_dim
-        
 
         if self.use_sde:
             latent_sde_dim = last_layer_dim
@@ -134,64 +111,6 @@ class Actor(BasePolicy):
             self.action_dist = SquashedDiagGaussianDistribution(action_dim)
             self.mu = nn.Linear(last_layer_dim, action_dim)
             self.log_std = nn.Linear(last_layer_dim, action_dim)
-            
-        self.z_means = th.zeros(latent_dim)
-        self.z_vars = th.ones(latent_dim)
-        self.z = th.zeros(latent_dim)
-        
-        
-    def clear_z(self):
-        '''
-        reset q(z|c) to the prior
-        sample a new z from the prior
-        '''
-        # reset distribution over z to the prior
-        mu = th.zeros(self.latent_dim)
-        
-        var = th.ones(self.latent_dim)
-
-        self.z_means = mu
-        self.z_vars = var
-        # sample a new z from the prior
-        self.sample_z()
-        # reset the context collected so far
-        self.context = None
-#        print('z cleared')
-
-    def sample_z(self):
-        
-        posteriors = [th.distributions.Normal(m, th.sqrt(s)) for m, s in zip(th.unbind(self.z_means), th.unbind(self.z_vars))]
-        z = [d.rsample() for d in posteriors]
-        self.z = th.stack(z)
-        self.z = th.zeros_like(self.z)
-        
-    def detach_z(self):
-        ''' disable backprop through z '''
-        self.z = self.z.detach()
-
-    def compute_kl_div(self):
-        ''' compute KL( q(z|c) || r(z) ) '''
-        prior = th.distributions.Normal(th.zeros(self.latent_dim), th.ones(self.latent_dim))
-        posteriors = [th.distributions.Normal(mu, th.sqrt(var)) for mu, var in zip(th.unbind(self.z_means), th.unbind(self.z_vars))]
-        kl_divs = [th.distributions.kl.kl_divergence(post, prior) for post in posteriors]
-        kl_div_sum = th.sum(th.stack(kl_divs))
-        return kl_div_sum
-
-    def infer_posterior(self, context):
-        ''' compute q(z|c) as a function of input context and sample new z from it'''
-        params = self.context_encoder(context)
-        params = params.view(context.size(0), -1, 10)
-        # with probabilistic z, predict mean and variance of q(z | c)
-       
-        mu = params[..., :self.latent_dim]
-        sigma_squared = F.softplus(params[..., self.latent_dim:])
-        z_params = [_product_of_gaussians(m, s) for m, s in zip(th.unbind(mu), th.unbind(sigma_squared))]
-        self.z_means = th.stack([p[0] for p in z_params])
-        self.z_vars = th.stack([p[1] for p in z_params])
-        
-        self.sample_z()
-        
-       
 
     def _get_data(self) -> Dict[str, Any]:
         data = super()._get_data()
@@ -236,7 +155,7 @@ class Actor(BasePolicy):
         assert isinstance(self.action_dist, StateDependentNoiseDistribution), msg
         self.action_dist.sample_weights(self.log_std, batch_size=batch_size)
 
-    def get_action_dist_params(self, obs: th.Tensor, z: th.Tensor, other_shape: bool = False) -> Tuple[th.Tensor, th.Tensor, Dict[str, th.Tensor]]:
+    def get_action_dist_params(self, obs: th.Tensor) -> Tuple[th.Tensor, th.Tensor, Dict[str, th.Tensor]]:
         """
         Get the parameters for the action distribution.
 
@@ -244,19 +163,7 @@ class Actor(BasePolicy):
         :return:
             Mean, standard deviation and optional keyword arguments.
         """
-#        features = self.extract_features(obs)
-        features = obs
-        #if int(features.shape[0]) == 1:
-            #features = features.flatten()
-        if len(z.shape) == 1:
-            z = z.reshape(1, self.latent_dim)
-
-        #if int(z.shape[0]) == 1 and int(z.shape[1]) == self.latent_dim:
-            #z = z.flatten()
-
-        
-        features = th.cat([features, z], dim=1)
-#        print('combined features:', features.shape)
+        features = self.extract_features(obs)
         latent_pi = self.latent_pi(features)
         mean_actions = self.mu(latent_pi)
 
@@ -269,48 +176,20 @@ class Actor(BasePolicy):
         log_std = self.log_std(latent_pi)
         # Original Implementation to cap the standard deviation
         log_std = th.clamp(log_std, LOG_STD_MIN, LOG_STD_MAX)
-        
-  
-#        print('MA Before:', mean_actions)
-        #TODO: WHY?  
-        #if not other_shape:      
-#        print(mean_actions.shape)
-        if mean_actions.shape[0] > 1:
-            pass
-        else:
-            pass
-        	#mean_actions = mean_actions.reshape(self.action_space.shape[0],1)
-#        print('MA AFTER:', mean_actions)
-        
-#        print('observation.shape[1:]:',obs.shape[1:],' == ', 'observation_space.shape:', self.observation_space.shape)
-
         return mean_actions, log_std, {}
 
-    def forward(self, obs: th.Tensor, z: th.Tensor = None, deterministic: bool = False, other_shape:bool = False) -> th.Tensor:
-        """
-        (a|z)
-        """
-        
-        if z == None:
-            self.sample_z()
-            z = self.z
-        #print(z)
-        
-        mean_actions, log_std, kwargs = self.get_action_dist_params(obs,z, other_shape = other_shape)
+    def forward(self, obs: th.Tensor, deterministic: bool = False) -> th.Tensor:
+        mean_actions, log_std, kwargs = self.get_action_dist_params(obs)
         # Note: the action is squashed
-#        print('MA AFTER:', mean_actions)
         return self.action_dist.actions_from_params(mean_actions, log_std, deterministic=deterministic, **kwargs)
 
-    def action_log_prob(self, obs: th.Tensor, z: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
-                
-        mean_actions, log_std, kwargs = self.get_action_dist_params(obs, z)
+    def action_log_prob(self, obs: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
+        mean_actions, log_std, kwargs = self.get_action_dist_params(obs)
         # return action and associated log prob
         return self.action_dist.log_prob_from_params(mean_actions, log_std, **kwargs)
 
-    def _predict(self, obs: th.Tensor, z: th.Tensor = None, deterministic: bool = False) -> th.Tensor:
-
-#        print('predict')
-        return self.forward(obs, z, deterministic)
+    def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
+        return self.forward(observation, deterministic)
 
 
 class SACPolicy(BasePolicy):
@@ -349,9 +228,8 @@ class SACPolicy(BasePolicy):
         self,
         observation_space: gym.spaces.Space,
         action_space: gym.spaces.Space,
-        lr_schedule: Callable,
-        latent_dim: int,
-        hidden_sizes:  Optional[List[int]] = None,
+        lr_schedule: Schedule,
+        latent_size: int = 5,
         net_arch: Optional[Union[List[int], Dict[str, List[int]]]] = None,
         activation_fn: Type[nn.Module] = nn.ReLU,
         use_sde: bool = False,
@@ -370,6 +248,7 @@ class SACPolicy(BasePolicy):
         super(SACPolicy, self).__init__(
             observation_space,
             action_space,
+            latent_size,
             features_extractor_class,
             features_extractor_kwargs,
             optimizer_class=optimizer_class,
@@ -396,7 +275,6 @@ class SACPolicy(BasePolicy):
         }
         self.actor_kwargs = self.net_args.copy()
         sde_kwargs = {
-            "latent_dim": latent_dim,
             "use_sde": use_sde,
             "log_std_init": log_std_init,
             "sde_net_arch": sde_net_arch,
@@ -405,8 +283,6 @@ class SACPolicy(BasePolicy):
         }
         self.actor_kwargs.update(sde_kwargs)
         self.critic_kwargs = self.net_args.copy()
-        
-        
         self.critic_kwargs.update(
             {
                 "n_critics": n_critics,
@@ -416,17 +292,15 @@ class SACPolicy(BasePolicy):
         )
 
         self.actor, self.actor_target = None, None
+        self.z_net = None
         self.critic, self.critic_target = None, None
         self.share_features_extractor = share_features_extractor
 
         self._build(lr_schedule)
 
-    def _build(self, lr_schedule: Callable) -> None:
+    def _build(self, lr_schedule: Schedule) -> None:
         self.actor = self.make_actor()
-     
-        
-        self.actor.optimizer = self.optimizer_class(self.actor.mu.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)#TODO: actor.parameters??????
-        self.actor.context_optimizer = self.optimizer_class(self.actor.context_encoder.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)
+        self.actor.optimizer = self.optimizer_class(self.actor.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)
 
         if self.share_features_extractor:
             self.critic = self.make_critic(features_extractor=self.actor.features_extractor)
@@ -444,6 +318,8 @@ class SACPolicy(BasePolicy):
         self.critic_target.load_state_dict(self.critic.state_dict())
 
         self.critic.optimizer = self.optimizer_class(critic_parameters, lr=lr_schedule(1), **self.optimizer_kwargs)
+        
+        self.z_net = self.make_z_net()
 
     def _get_data(self) -> Dict[str, Any]:
         data = super()._get_data()
@@ -481,24 +357,101 @@ class SACPolicy(BasePolicy):
 
     def make_critic(self, features_extractor: Optional[BaseFeaturesExtractor] = None) -> ContinuousCritic:
         critic_kwargs = self._update_features_extractor(self.critic_kwargs, features_extractor)
-        critic_kwargs['features_dim'] = critic_kwargs['features_dim'] + self.actor.latent_dim
         return ContinuousCritic(**critic_kwargs).to(self.device)
-
+##########        
+    def make_z_net(self):
+        hidden_sizes=[200, 200, 200]
+        reward_dim = 1
+        context_encoder_input_dim = get_flattened_obs_dim(self.observation_space) + get_action_dim(self.action_space) + reward_dim
+        context_encoder_output_dim = self.latent_size * 2
+    	
+        z_net = create_mlp(input_dim = context_encoder_input_dim, output_dim = context_encoder_output_dim, net_arch = hidden_sizes, activation_fn = nn.ReLU)
+        self.z_net = nn.Sequential(*z_net)
+        print('z_net created')
+    	
+        return self.z_net.to(self.device)
+#########
     def forward(self, obs: th.Tensor, deterministic: bool = False) -> th.Tensor:
-        print('this fwd?')
         return self._predict(obs, deterministic=deterministic)
 
     def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
-        #this is the predict fkt for 'evaluate'
-#        print('predict?')
-        action = self.actor(observation, self.actor.z, deterministic=deterministic, other_shape = True)
-        
-#        print('returned action', action.reshape(1,1,self.action_space.shape[0]))
-        
-        return action.reshape(1,self.action_space.shape[0])
+        return self.actor(observation, deterministic)
 
 
 MlpPolicy = SACPolicy
 
+
+class CnnPolicy(SACPolicy):
+    """
+    Policy class (with both actor and critic) for SAC.
+
+    :param observation_space: Observation space
+    :param action_space: Action space
+    :param lr_schedule: Learning rate schedule (could be constant)
+    :param net_arch: The specification of the policy and value networks.
+    :param activation_fn: Activation function
+    :param use_sde: Whether to use State Dependent Exploration or not
+    :param log_std_init: Initial value for the log standard deviation
+    :param sde_net_arch: Network architecture for extracting features
+        when using gSDE. If None, the latent features from the policy will be used.
+        Pass an empty list to use the states as features.
+    :param use_expln: Use ``expln()`` function instead of ``exp()`` when using gSDE to ensure
+        a positive standard deviation (cf paper). It allows to keep variance
+        above zero and prevent it from growing too fast. In practice, ``exp()`` is usually enough.
+    :param clip_mean: Clip the mean output when using gSDE to avoid numerical instability.
+    :param features_extractor_class: Features extractor to use.
+    :param normalize_images: Whether to normalize images or not,
+         dividing by 255.0 (True by default)
+    :param optimizer_class: The optimizer to use,
+        ``th.optim.Adam`` by default
+    :param optimizer_kwargs: Additional keyword arguments,
+        excluding the learning rate, to pass to the optimizer
+    :param n_critics: Number of critic networks to create.
+    :param share_features_extractor: Whether to share or not the features extractor
+        between the actor and the critic (this saves computation time)
+    """
+
+    def __init__(
+        self,
+        observation_space: gym.spaces.Space,
+        action_space: gym.spaces.Space,
+        lr_schedule: Schedule,
+        net_arch: Optional[Union[List[int], Dict[str, List[int]]]] = None,
+        activation_fn: Type[nn.Module] = nn.ReLU,
+        use_sde: bool = False,
+        log_std_init: float = -3,
+        sde_net_arch: Optional[List[int]] = None,
+        use_expln: bool = False,
+        clip_mean: float = 2.0,
+        features_extractor_class: Type[BaseFeaturesExtractor] = NatureCNN,
+        features_extractor_kwargs: Optional[Dict[str, Any]] = None,
+        normalize_images: bool = True,
+        optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam,
+        optimizer_kwargs: Optional[Dict[str, Any]] = None,
+        n_critics: int = 2,
+        share_features_extractor: bool = True,
+    ):
+        super(CnnPolicy, self).__init__(
+            observation_space,
+            action_space,
+            lr_schedule,
+            net_arch,
+            activation_fn,
+            use_sde,
+            log_std_init,
+            sde_net_arch,
+            use_expln,
+            clip_mean,
+            features_extractor_class,
+            features_extractor_kwargs,
+            normalize_images,
+            optimizer_class,
+            optimizer_kwargs,
+            n_critics,
+            share_features_extractor,
+        )
+
+
 register_policy("MlpPolicy", MlpPolicy)
+register_policy("CnnPolicy", CnnPolicy)
 

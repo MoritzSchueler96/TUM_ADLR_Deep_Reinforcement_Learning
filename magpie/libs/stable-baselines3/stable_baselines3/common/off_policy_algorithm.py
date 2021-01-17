@@ -245,9 +245,23 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         )
 
         callback.on_training_start(locals(), globals())
-
+        print('rollout')
+        i=0
+        self.actor.clear_z()
+        self.env.reset()
+        num_steps_prior= 400
+        num_extra_rl_steps_posterior = 3
+        self.train_freq = 200
+        
         while self.num_timesteps < total_timesteps:
+            i=i+1
+            
+            if self.num_timesteps%200 ==0 and self.num_timesteps > 0:
+                self.env.reset()
 
+                if self.num_timesteps < num_extra_rl_steps_posterior*200:
+                    self.actor.clear_z()
+                    print('collect with prior')
             rollout = self.collect_rollouts(
                 self.env,
                 n_episodes=self.n_episodes_rollout,
@@ -258,17 +272,31 @@ class OffPolicyAlgorithm(BaseAlgorithm):
                 replay_buffer=self.replay_buffer,
                 log_interval=log_interval,
             )
+            
 
             if rollout.continue_training is False:
                 break
-
-            if self.num_timesteps > 0 and self.num_timesteps > self.learning_starts:
+                    
+            if self.num_timesteps >= num_extra_rl_steps_posterior*200:
+                #print('collect with posterior')
+                context = self.sample_context(int(self.replay_buffer.pos/200)+1)
+                self.actor.infer_posterior( context )
+                self.train_freq = 1
+#            if self.num_timesteps > 0 and self.num_timesteps > self.learning_starts:
                 # If no `gradient_steps` is specified,
                 # do as many gradients steps as steps performed during the rollout
-                gradient_steps = self.gradient_steps if self.gradient_steps > 0 else rollout.episode_timesteps
+#                gradient_steps = self.gradient_steps if self.gradient_steps > 0 else rollout.episode_timesteps
+#                self.train(batch_size=self.batch_size, gradient_steps=gradient_steps)
+            if (self.num_timesteps % (5* 200)) == 0:
+                print('apply grads')
+                gradient_steps =200#self.gradient_steps
                 self.train(batch_size=self.batch_size, gradient_steps=gradient_steps)
-
+        
+        
         callback.on_training_end()
+
+        
+        
 
         return self
 
@@ -304,6 +332,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             # Note: when using continuous actions,
             # we assume that the policy uses tanh to scale the action
             # We use non-deterministic action in the case of SAC, for TD3, it does not matter
+            
             unscaled_action, _ = self.predict(self._last_obs, deterministic=False)
 
         # Rescale the action from [low, high] to [-1, 1]
@@ -385,7 +414,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
 
         assert isinstance(env, VecEnv), "You must pass a VecEnv"
         assert env.num_envs == 1, "OffPolicyAlgorithm only support single environment"
-
+        
         if self.use_sde:
             self.actor.reset_noise()
 
@@ -407,6 +436,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
 
                 # Rescale and perform action
                 new_obs, reward, done, infos = env.step(action)
+
 
                 self.num_timesteps += 1
                 episode_timesteps += 1
