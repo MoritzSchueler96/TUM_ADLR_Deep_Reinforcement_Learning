@@ -126,15 +126,15 @@ def evaluate_meta_policy(
         episode_length = 0
         model.actor.clear_z()
         
+        env.reset_task(model.n_traintasks+i)
+        
+        model.RBList_eval[i].reset()
+        
+        
         while not done:
             with th.no_grad():
-# when to resample context? TODO
+# when to resamp
                 
-                # Select action randomly or according to policy
-                if model.replay_buffer.pos > 100*200 and i > 0:
-                    context = model.sample_context(int(model.replay_buffer.pos/200), depth =200)
-                    model.actor.infer_posterior(context)
-                    model.actor.sample_z()
                 
                 action, buffer_action = model.actor.predict(obs, model.actor.z, deterministic=True) #none for deterministic
                 
@@ -157,13 +157,17 @@ def evaluate_meta_policy(
     
                 episode_reward += reward
 
-                if add2buff:
-                    model.replay_buffer.add(obs = _last_original_obs, next_obs = new_obs, action  =action, reward =  reward_, done = done)
+                
+                model.RBList_eval[i].add(obs = _last_original_obs, next_obs = new_obs, action  =action, reward =  reward_, done = done)
+    
+                context = model.sample_context(i , buff = model.RBList_eval)
+                model.actor.infer_posterior( context )
+                
     
                 _last_obs = new_obs
                 # Save the unnormalized observation
           
-
+                
 
         if done:
             total_episodes += 1

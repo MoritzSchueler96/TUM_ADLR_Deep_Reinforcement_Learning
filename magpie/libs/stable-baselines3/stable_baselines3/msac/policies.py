@@ -163,7 +163,7 @@ class Actor(BasePolicy):
         posteriors = [th.distributions.Normal(m, th.sqrt(s)) for m, s in zip(th.unbind(self.z_means), th.unbind(self.z_vars))]
         z = [d.rsample() for d in posteriors]
         self.z = th.stack(z)
-        self.z = th.zeros_like(self.z)
+#        self.z = th.zeros_like(self.z)
         
     def detach_z(self):
         ''' disable backprop through z '''
@@ -180,17 +180,47 @@ class Actor(BasePolicy):
     def infer_posterior(self, context):
         ''' compute q(z|c) as a function of input context and sample new z from it'''
         params = self.context_encoder(context)
-        params = params.view(context.size(0), -1, 10)
+
+        params = params.view(context.size(0), -1, 2*self.latent_dim)
         # with probabilistic z, predict mean and variance of q(z | c)
        
         mu = params[..., :self.latent_dim]
+        
+        
         sigma_squared = F.softplus(params[..., self.latent_dim:])
         z_params = [_product_of_gaussians(m, s) for m, s in zip(th.unbind(mu), th.unbind(sigma_squared))]
+
+        self.z_means = th.stack([p[0] for p in z_params])
+        self.z_vars = th.stack([p[1] for p in z_params])
+       
+        
+        self.sample_z()
+        
+    def infer_posterior_atinference(self, context):
+        ''' compute q(z|c) as a function of input context and sample new z from it'''
+        params = self.context_encoder(context)
+        params = params.view(context.size(0), -1, 2*self.latent_dim)
+        # with probabilistic z, predict mean and variance of q(z | c)
+       
+        mu = params[..., :self.latent_dim]
+        
+        mu = th.mean(mu,dim=0).reshape(self.latent_dim,1)
+
+        sigma_squared = F.softplus(params[..., self.latent_dim:])
+        
+        sigma_squared = th.mean(sigma_squared,dim=0).reshape(self.latent_dim,1)
+        
+        
+        
+        z_params = [_product_of_gaussians(m, s) for m, s in zip(th.unbind(mu), th.unbind(sigma_squared))]
+
+
+
         self.z_means = th.stack([p[0] for p in z_params])
         self.z_vars = th.stack([p[1] for p in z_params])
         
         self.sample_z()
-        
+
        
 
     def _get_data(self) -> Dict[str, Any]:

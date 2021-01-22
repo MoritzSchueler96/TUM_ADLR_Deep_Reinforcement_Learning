@@ -77,6 +77,11 @@ class mSAC(OffPolicyAlgorithm):
         learning_rate: Union[float, Callable] = 3e-4,
         buffer_size: int = int(1e6),
         learning_starts: int = 0,
+        
+        n_traintasks: int = 0,
+        n_evaltasks: int = 0,
+        n_epochtasks: int = 0,
+        
         batch_size: int = 256,
         tau: float = 0.005,
         gamma: float = 0.99,
@@ -107,6 +112,9 @@ class mSAC(OffPolicyAlgorithm):
             learning_rate,
             buffer_size,
             learning_starts,
+            n_traintasks,
+            n_evaltasks,
+            n_epochtasks,
             batch_size,
             tau,
             gamma,
@@ -136,6 +144,9 @@ class mSAC(OffPolicyAlgorithm):
 
         self.indices = None
         self.context = None
+        
+        self.encodermap = None
+        self.replaymap = None
         
         if _init_setup_model:
             self._setup_model()
@@ -177,32 +188,67 @@ class mSAC(OffPolicyAlgorithm):
         self.critic = self.policy.critic
         self.critic_target = self.policy.critic_target
         
-    def sample_context(self, indices, depth =1000):
+    def sample_context(self, indices, buff = None):
         ''' sample batch of context from a list of tasks from the replay buffer '''
         # make method work given a single task index
         if not hasattr(indices, '__iter__'):
             indices = [indices]
 #        print('indices in contextsampling', indices)
 
+        
         final = th.zeros(len(indices),100,27)
         
-        for i,idx in enumerate(indices):
+      
+   #     print(indices)
+    #    print(self.encodermap['end'])
+     #   print(self.replaymap['end'])
+        if len(indices) >1:
+            
+            for i,idx in enumerate(indices):
         
-            # zu diesem Zeitpunkt sind hoffentlich n_tasks * 200 samples im buffer. 
-            # to map idx to task is_
-            # lower: idx*200
-            # upper: (idx+1)*200 
-            sample_pos = np.random.randint(depth, size=(100))
-#            print('current buffer pos:',self.replay_buffer.pos)
+                sample_pos = np.random.randint(self.RBList_encoder[idx].pos, size=(100))
+ 
+                sample = self.RBList_encoder[idx]._get_samples(sample_pos) 
+
+                final[i]=th.cat([sample.observations,sample.actions,sample.rewards], dim=1)
+        else:
+            if buff is not None:
+                sample_pos = np.random.randint(buff[indices[0]].pos, size=(100))
+ 
+                sample = buff[indices[0]]._get_samples(sample_pos) 
+
+                final=th.cat([sample.observations,sample.actions,sample.rewards], dim=1)           
             
-            sample = self.replay_buffer._get_samples(self.replay_buffer.pos - sample_pos)
-#            print(idx, th.cat([sample.observations,sample.actions,sample.rewards], dim=1).shape)
-            final[i]=th.cat([sample.observations,sample.actions,sample.rewards], dim=1)
-            
+            else:
+                sample_pos = np.random.randint(self.RBList_encoder[indices[0]].pos, size=(100))
+ 
+                sample = self.RBList_encoder[indices[0]]._get_samples(sample_pos) 
+
+                final=th.cat([sample.observations,sample.actions,sample.rewards], dim=1)
+            final = final.view(1, 100, 27)
+        return final
+        
+    def sample_context_atinference(self, indices=[], depth =200):
+        ''' sample batch of context from a list of tasks from the replay buffer '''
+        # make method work given a single task index
+        if not hasattr(indices, '__iter__'):
+            indices = [indices]
+#        print('indices in contextsampling', indices)
+
+        final = th.zeros(1,100,27)
+        
+        if depth == 0:
+            depth = 1
+
+        sample_pos = np.random.randint(depth, size=(100)) #FUCKING TODO
+           
+        sample = self.replay_buffer._get_samples(self.replay_buffer.pos - sample_pos)   
+
+        final=th.cat([sample.observations,sample.actions,sample.rewards], dim=1)
         
         return final
 
-    def train(self, gradient_steps: int, batch_size: int = 64) -> None:
+    def train(self, gradient_steps: int, batch_size: int = 64, indices = []) -> None:
         # Update optimizers learning rate
         optimizers = [self.actor.optimizer, self.actor.context_optimizer, self.critic.optimizer] 
         if self.ent_coef_optimizer is not None:
@@ -215,25 +261,17 @@ class mSAC(OffPolicyAlgorithm):
         actor_losses, critic_losses = [], []
         kl_losses = []
         l_z_means, l_z_vars = [], []
+             
+           
+        self.indices = indices  
         
-
         for gradient_step in range(gradient_steps):
         
-            n_done_tasks = int(self.replay_buffer.pos / 200)
-        
+           
             
             
-            self.indices = np.random.choice(n_done_tasks, 16)    
-            self.context = self.sample_context(self.indices,depth=10)#(gradient_steps-gradient_step))
+            self.context = self.sample_context(self.indices)#(gradient_steps-gradient_step))
 #            print('performing gradient Step')
-            num_tasks = len(self.indices)
-#            print('context[0][0][0]' , context[0], context.shape) 
-            
-#            print('performing gradient Step')
-
-#            print('context[0][0]' , context[0][0], context.shape) 
-            
-            
             # Sample replay buffer
             obs = th.zeros(16,batch_size,20)
             next_observations = th.zeros(16,batch_size,20)
@@ -243,9 +281,11 @@ class mSAC(OffPolicyAlgorithm):
 
             for i,idx in enumerate(self.indices):
         
-                sample_pos = np.random.randint(200, size=(batch_size))
-            
-                sample = self.replay_buffer._get_samples((idx+1)*200-sample_pos)
+                sample_pos = np.random.randint(self.RBList_replay[idx].pos,size=(batch_size))
+ 
+                sample = self.RBList_replay[idx]._get_samples(sample_pos) 
+
+
                 obs[i]=sample.observations
                 next_observations[i]=sample.next_observations
                 actions[i]=sample.actions
