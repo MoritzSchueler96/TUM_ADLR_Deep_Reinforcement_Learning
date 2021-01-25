@@ -77,6 +77,11 @@ class mSAC(OffPolicyAlgorithm):
         learning_rate: Union[float, Callable] = 3e-4,
         buffer_size: int = int(1e6),
         learning_starts: int = 0,
+        
+        n_traintasks: int = 0,
+        n_evaltasks: int = 0,
+        n_epochtasks: int = 0,
+        
         batch_size: int = 256,
         tau: float = 0.005,
         gamma: float = 0.99,
@@ -107,6 +112,9 @@ class mSAC(OffPolicyAlgorithm):
             learning_rate,
             buffer_size,
             learning_starts,
+            n_traintasks,
+            n_evaltasks,
+            n_epochtasks,
             batch_size,
             tau,
             gamma,
@@ -133,6 +141,16 @@ class mSAC(OffPolicyAlgorithm):
         self.ent_coef = ent_coef
         self.target_update_interval = target_update_interval
         self.ent_coef_optimizer = None
+
+        self.indices = None
+        self.context = None
+        
+        self.ent_coef_losses, self.ent_coefs = [], []
+        self.actor_losses, self.critic_losses = [], []
+        self.kl_losses = []
+        self.l_z_means, self.l_z_vars = [], []
+        
+
 
         if _init_setup_model:
             self._setup_model()
@@ -174,32 +192,42 @@ class mSAC(OffPolicyAlgorithm):
         self.critic = self.policy.critic
         self.critic_target = self.policy.critic_target
         
-    def sample_context(self, indices):
+    def sample_context(self, indices, buff = None):
         ''' sample batch of context from a list of tasks from the replay buffer '''
         # make method work given a single task index
         if not hasattr(indices, '__iter__'):
             indices = [indices]
 #        print('indices in contextsampling', indices)
 
-        final = th.zeros(16,100,27)
+        
+        final = th.zeros(len(indices),100,27)
+        
+      
+   #     print(indices)
+    #    print(self.encodermap['end'])
+     #   print(self.replaymap['end'])
+        if len(indices) >1:
+            
+            for i,idx in enumerate(indices):
+ 
+                sample = self.RBList_encoder[idx].sample(batch_size=100) 
 
-        for i,idx in enumerate(indices):
-        
-            # zu diesem Zeitpunkt sind hoffentlich n_tasks * 200 samples im buffer. 
-            # to map idx to task is_
-            # lower: idx*200
-            # upper: (idx+1)*200 
-            sample_pos = np.random.randint(200, size=(100))
-#            print('current buffer pos:',self.replay_buffer.pos)
+                final[i]=th.cat([sample.observations,sample.actions,sample.rewards], dim=1)
+        else:
+            if buff is not None:
+                sample = buff[indices[0]].sample(batch_size=100) 
+
+                final=th.cat([sample.observations,sample.actions,sample.rewards], dim=1)           
             
-            sample = self.replay_buffer._get_samples((idx+1)*200-sample_pos)
-#            print(idx, th.cat([sample.observations,sample.actions,sample.rewards], dim=1).shape)
-            final[i]=th.cat([sample.observations,sample.actions,sample.rewards], dim=1)
-            
-        
+            else:
+                sample = self.RBList_encoder[indices[0]].sample(batch_size=100) 
+
+                final=th.cat([sample.observations,sample.actions,sample.rewards], dim=1)
+            final = final.view(1, 100, 27)
         return final
+        
 
-    def train(self, gradient_steps: int, batch_size: int = 64) -> None:
+    def train(self, gradient_steps: int, batch_size: int = 64, indices = []) -> None:
         # Update optimizers learning rate
         optimizers = [self.actor.optimizer, self.actor.context_optimizer, self.critic.optimizer] 
         if self.ent_coef_optimizer is not None:
@@ -207,77 +235,59 @@ class mSAC(OffPolicyAlgorithm):
 
         # Update learning rate according to lr schedule
         self._update_learning_rate(optimizers)
-
-        ent_coef_losses, ent_coefs = [], []
-        actor_losses, critic_losses = [], []
-        kl_losses = []
-        l_z_means, l_z_vars = [], []
         
-
+           
+             
+           
+        self.indices = indices  
+        
         for gradient_step in range(gradient_steps):
         
-            n_done_tasks = self.replay_buffer.pos % 200
-        
-            indices = np.random.choice(n_done_tasks, 16)
-            context = self.sample_context(indices)#(gradient_steps-gradient_step))
-#            print('performing gradient Step')
-            num_tasks = len(indices)
-#            print('context[0][0][0]' , context[0], context.shape) 
-            
-#            print('performing gradient Step')
-
-#            print('context[0][0]' , context[0][0], context.shape) 
+           
             
             
-            # Sample replay buffer
             obs = th.zeros(16,batch_size,20)
             next_observations = th.zeros(16,batch_size,20)
             actions = th.zeros(16,batch_size,6)
             rewards = th.zeros(16,batch_size,1)
             dones = th.zeros(16,batch_size,1)
 
-            for i,idx in enumerate(indices):
-        
-                sample_pos = np.random.randint(200, size=(batch_size))
-            
-                sample = self.replay_buffer._get_samples((idx+1)*200-sample_pos)
+            for i,idx in enumerate(self.indices):
+         
+                sample = self.RBList_replay[idx].sample(batch_size=batch_size)
+
                 obs[i]=sample.observations
                 next_observations[i]=sample.next_observations
                 actions[i]=sample.actions
                 rewards[i]=sample.rewards
                 dones[i]=sample.dones
-#            print('obs[0][0][0]',obs[0][0][0], obs.shape) 
-#            print('obs[0][0][0]',next_observations[0][0][0], next_observations.shape) 
-                   
-            # We need to sample because `log_std` may have changed between two gradient steps
+
             if self.use_sde:
                 self.actor.reset_noise()        
         
             # run inference in networks
-            self.actor.infer_posterior(context)
-            self.actor.sample_z()
             task_z = self.actor.z
-            
-#            print('z_before:', task_z)
+
             
             t, b, _ = obs.size()
-#            print(t, b)
             obs = obs.view(t * b, -1)
             next_observations = next_observations.view(t * b, -1)
             rewards = rewards.view(t * b, -1)
             dones = dones.view(t * b, -1)
             actions = actions.view(t * b, -1)
-            
+
             task_z = [z.repeat(b, 1) for z in task_z]
-            task_z = th.cat(task_z, dim=0)
             
+            task_z = th.cat(task_z, dim=0)
 #            print('task_z',task_z, task_z.shape)
+            
+#            
                          
             # logging
             local_means = self.actor.z_means.clone().detach().numpy()
             local_vars = self.actor.z_vars.clone().detach().numpy()
-            l_z_means.append(local_means)
-            l_z_vars.append(local_vars)
+            self.l_z_means.append(local_means)
+            self.l_z_vars.append(local_vars)
             
             
             # run policy, get log probs and new actions
@@ -292,11 +302,11 @@ class mSAC(OffPolicyAlgorithm):
                 # see https://github.com/rail-berkeley/softlearning/issues/60
                 ent_coef = th.exp(self.log_ent_coef.detach())
                 ent_coef_loss = -(self.log_ent_coef * (log_prob + self.target_entropy).detach()).mean()
-                ent_coef_losses.append(ent_coef_loss.item())
+                self.ent_coef_losses.append(ent_coef_loss.item())
             else:
                 ent_coef = self.ent_coef_tensor
 
-            ent_coefs.append(ent_coef.item())
+            self.ent_coefs.append(ent_coef.item())
 
             # Optimize entropy coefficient, also called
             # entropy temperature or alpha in the paper
@@ -312,7 +322,7 @@ class mSAC(OffPolicyAlgorithm):
             kl_div = self.actor.compute_kl_div()
             kl_loss = 0.1 * kl_div
             kl_loss.backward(retain_graph=True)
-            kl_losses.append(kl_loss.clone().detach().numpy())    
+            self.kl_losses.append(kl_loss.clone().detach().numpy())    
                 
 
             with th.no_grad():
@@ -350,7 +360,7 @@ class mSAC(OffPolicyAlgorithm):
 
             # Compute critic loss
             critic_loss = 0.5 * sum([F.mse_loss(current_q, q_backup) for current_q in current_q_estimates])
-            critic_losses.append(critic_loss.item())
+            self.critic_losses.append(critic_loss.item())
 
             # Optimize the critic
             self.critic.optimizer.zero_grad()
@@ -365,12 +375,14 @@ class mSAC(OffPolicyAlgorithm):
             q_values_pi = th.cat(self.critic.forward(obs, own_actions_and_z), dim=1)
             min_qf_pi, _ = th.min(q_values_pi, dim=1, keepdim=True)
             actor_loss = (ent_coef * log_prob - min_qf_pi).mean()
-            actor_losses.append(actor_loss.item())
+            self.actor_losses.append(actor_loss.item())
 
             # Optimize the actor
             self.actor.optimizer.zero_grad()
             actor_loss.backward()
             self.actor.optimizer.step()
+            
+            self.actor.detach_z()
 
             # Update target networks
             if gradient_step % self.target_update_interval == 0:
@@ -379,14 +391,14 @@ class mSAC(OffPolicyAlgorithm):
         self._n_updates += gradient_steps
 
         logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
-        logger.record("train/ent_coef", np.mean(ent_coefs))
-        logger.record("train/actor_loss", np.mean(actor_losses))
-        logger.record("train/critic_loss", np.mean(critic_losses))
-        logger.record("train/KL_loss", np.mean(np.asarray(kl_losses)))
-        logger.record("train/avg. z", np.mean(np.asarray(l_z_means)))
-        logger.record("train/avg. z var", np.mean(np.asarray(l_z_vars)))
-        if len(ent_coef_losses) > 0:
-            logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
+        logger.record("train/ent_coef", np.mean(self.ent_coefs))
+        logger.record("train/actor_loss", np.mean(self.actor_losses))
+        logger.record("train/critic_loss", np.mean(self.critic_losses))
+        logger.record("train/KL_loss", np.mean(np.asarray(self.kl_losses)))
+        logger.record("train/avg. z", np.mean(np.asarray(self.l_z_means)))
+        logger.record("train/avg. z var", np.mean(np.asarray(self.l_z_vars)))
+        if len(self.ent_coef_losses) > 0:
+            logger.record("train/ent_coef_loss", np.mean(self.ent_coef_losses))
 
     def learn(
         self,

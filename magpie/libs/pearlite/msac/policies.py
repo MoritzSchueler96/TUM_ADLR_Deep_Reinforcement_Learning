@@ -5,6 +5,7 @@ import torch as th
 from torch import nn
 import torch.nn.functional as F
 import numpy as np
+from torch.distributions import Distribution, Normal
 
 from stable_baselines3.common.distributions import SquashedDiagGaussianDistribution, StateDependentNoiseDistribution
 from stable_baselines3.common.policies import BasePolicy, ContinuousCritic, create_sde_features_extractor, register_policy
@@ -16,6 +17,71 @@ from stable_baselines3.common.torch_layers import (
     create_mlp,
     get_actor_critic_arch,
 )
+
+
+class TanhNormal(Distribution):
+    """
+    Represent distribution of X where
+        X ~ tanh(Z)
+        Z ~ N(mean, std)
+
+    Note: this is not very numerically stable.
+    """
+    def __init__(self, normal_mean, normal_std, epsilon=1e-6):
+        """
+        :param normal_mean: Mean of the normal distribution
+        :param normal_std: Std of the normal distribution
+        :param epsilon: Numerical stability epsilon when computing log-prob.
+        """
+        self.normal_mean = normal_mean
+        self.normal_std = normal_std
+        self.normal = Normal(normal_mean, normal_std)
+        self.epsilon = epsilon
+
+    def sample_n(self, n, return_pre_tanh_value=False):
+        z = self.normal.sample_n(n)
+        if return_pre_tanh_value:
+            return th.tanh(z), z
+        else:
+            return th.tanh(z)
+
+    def log_prob(self, value, pre_tanh_value=None):
+        """
+        :param value: some value, x
+        :param pre_tanh_value: arctanh(x)
+        :return:
+        """
+        if pre_tanh_value is None:
+            pre_tanh_value = th.log(
+                (1+value) / (1-value)
+            ) / 2
+        return self.normal.log_prob(pre_tanh_value) - th.log(
+            1 - value * value + self.epsilon
+        )
+
+    def sample(self, return_pretanh_value=False):
+        z = self.normal.sample()
+        if return_pretanh_value:
+            return th.tanh(z), z
+        else:
+            return th.tanh(z)
+
+    def rsample(self, return_pretanh_value=False):
+        z = (
+            self.normal_mean +
+            self.normal_std *
+            Variable(Normal(
+                th.zeros(self.normal_mean.size()),
+                th.ones(self.normal_std.size())
+            ).sample())
+        )
+        # z.requires_grad_()
+        if return_pretanh_value:
+            return th.tanh(z), z
+        else:
+            return th.tanh(z)
+
+
 
 # CAP the standard deviation of the actor
 LOG_STD_MAX = 2
@@ -163,7 +229,7 @@ class Actor(BasePolicy):
         posteriors = [th.distributions.Normal(m, th.sqrt(s)) for m, s in zip(th.unbind(self.z_means), th.unbind(self.z_vars))]
         z = [d.rsample() for d in posteriors]
         self.z = th.stack(z)
-
+#        self.z = th.zeros_like(self.z)
         
     def detach_z(self):
         ''' disable backprop through z '''
@@ -180,17 +246,23 @@ class Actor(BasePolicy):
     def infer_posterior(self, context):
         ''' compute q(z|c) as a function of input context and sample new z from it'''
         params = self.context_encoder(context)
-        params = params.view(context.size(0), -1, 10)
+
+        params = params.view(context.size(0), -1, 2*self.latent_dim)
         # with probabilistic z, predict mean and variance of q(z | c)
        
         mu = params[..., :self.latent_dim]
+        
+        
         sigma_squared = F.softplus(params[..., self.latent_dim:])
         z_params = [_product_of_gaussians(m, s) for m, s in zip(th.unbind(mu), th.unbind(sigma_squared))]
+
         self.z_means = th.stack([p[0] for p in z_params])
         self.z_vars = th.stack([p[1] for p in z_params])
+       
         
         self.sample_z()
         
+   
        
 
     def _get_data(self) -> Dict[str, Any]:
@@ -269,7 +341,7 @@ class Actor(BasePolicy):
         log_std = self.log_std(latent_pi)
         # Original Implementation to cap the standard deviation
         log_std = th.clamp(log_std, LOG_STD_MIN, LOG_STD_MAX)
-        
+        std = th.exp(log_std)
   
 #        print('MA Before:', mean_actions)
         #TODO: WHY?  
@@ -283,8 +355,10 @@ class Actor(BasePolicy):
 #        print('MA AFTER:', mean_actions)
         
 #        print('observation.shape[1:]:',obs.shape[1:],' == ', 'observation_space.shape:', self.observation_space.shape)
+        tanh_normal = TanhNormal(mean_actions, std)
+        action = tanh_normal.sample()
 
-        return mean_actions, log_std, {}
+        return action, log_std, {}#mean_actions, log_std, {}
 
     def forward(self, obs: th.Tensor, z: th.Tensor = None, deterministic: bool = False, other_shape:bool = False) -> th.Tensor:
         """
@@ -299,13 +373,15 @@ class Actor(BasePolicy):
         mean_actions, log_std, kwargs = self.get_action_dist_params(obs,z, other_shape = other_shape)
         # Note: the action is squashed
 #        print('MA AFTER:', mean_actions)
-        return self.action_dist.actions_from_params(mean_actions, log_std, deterministic=deterministic, **kwargs)
+        #return self.action_dist.actions_from_params(mean_actions, log_std, deterministic=deterministic, **kwargs)
+        return mean_actions#, log_std
 
     def action_log_prob(self, obs: th.Tensor, z: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
                 
         mean_actions, log_std, kwargs = self.get_action_dist_params(obs, z)
         # return action and associated log prob
-        return self.action_dist.log_prob_from_params(mean_actions, log_std, **kwargs)
+        _, log_prob =  self.action_dist.log_prob_from_params(mean_actions, log_std, **kwargs)
+        return mean_actions, log_prob
 
     def _predict(self, obs: th.Tensor, z: th.Tensor = None, deterministic: bool = False) -> th.Tensor:
 
@@ -495,7 +571,7 @@ class SACPolicy(BasePolicy):
         
 #        print('returned action', action.reshape(1,1,self.action_space.shape[0]))
         
-        return action.reshape(1,self.action_space.shape[0])
+        return action#.reshape(1,self.action_space.shape[0])
 
 
 MlpPolicy = SACPolicy

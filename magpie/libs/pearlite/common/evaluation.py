@@ -73,6 +73,7 @@ def evaluate_meta_policy(
     model: "base_class.BaseAlgorithm",
     env: Union[gym.Env, VecEnv],
     n_eval_episodes: int = 10,
+    add2buff = False,
     deterministic: bool = True,
     render: bool = False,
     callback: Optional[Callable] = None,
@@ -103,7 +104,7 @@ def evaluate_meta_policy(
 
     _last_obs = []
     total_episodes = 0
-    replay_buffer = model.replay_buffer
+
     continue_training = False
     num_timesteps = 0
     total_steps = 0
@@ -112,7 +113,7 @@ def evaluate_meta_policy(
 
     episode_rewards, episode_lengths = [], []
     reward = []
-    replay_buffer.reset()
+
     model.actor.clear_z()
     
     for i in range(n_eval_episodes):
@@ -123,60 +124,52 @@ def evaluate_meta_policy(
         done, state = False, None
         episode_reward = 0.0
         episode_length = 0
-        model.actor.clear_z()
-        while not done:
-            with th.no_grad():
 
-                if replay_buffer.pos > 15*200:
-               
         
-                    indices = replay_buffer.pos % 200
-                    sample_pos = np.random.randint(100, size=(1))
-            
-                    context = th.zeros(1,27)
-                    sample = replay_buffer._get_samples((indices+1)*200-sample_pos)
+        env.reset_task(model.n_traintasks+i)
+        
+        model.RBList_eval[i].reset()
+        with th.no_grad():
+            model.actor.clear_z()
+        
+        
+        for run in range(3):
+            env.reset()
+            with th.no_grad():
+                for timestep in range(200):
 
-                    context = th.cat([sample.observations,sample.actions,sample.rewards], dim=1)
-                  
-                    model.actor.infer_posterior(context)
+                    action_old, _ = model.actor.predict(obs, model.actor.z, deterministic=True) #none for deterministic
                     
-                    model.actor.sample_z()
-                # Select action randomly or according to policy
-                
-                action, buffer_action = model.actor.predict(obs, model.actor.z, deterministic=True) #none for deterministic
-                
-                
-                # Rescale and perform action   
-                new_obs, reward, done, infos = env.step(action)
-                obs = th.Tensor(new_obs)
-                
-                    
-               
-                if model._vec_normalize_env is not None: ##delete? TODO
-                    new_obs_ = model._vec_normalize_env.get_original_obs()
-                    reward_ = model._vec_normalize_env.get_original_reward()
+                    action, log_prob = model.actor.action_log_prob(obs.reshape(1,-1), model.actor.z.clone().detach())
+                    # Rescale and perform action   
 
-                else:
+                    new_obs, reward, done, infos = env.step(action[0].numpy())
+                    obs = th.Tensor(new_obs)
+                    if model._vec_normalize_env is not None: ##delete? TODO
+                        new_obs_ = model._vec_normalize_env.get_original_obs()
+                        reward_ = model._vec_normalize_env.get_original_reward()
+
+                    else:
                     # Avoid changing the original ones
-                    _last_original_obs, new_obs_, reward_ = _last_obs, new_obs, reward
+                        _last_original_obs, new_obs_, reward_ = _last_obs, new_obs, reward
 
-                # Only stop training if return value is False, not when it is None.
-    
-                episode_reward += reward
+                    episode_reward += reward
 
+                    model.RBList_eval[i].add(obs = _last_original_obs, next_obs = new_obs, action  =action, reward =  reward_, done = done)
+                    model.actor.sample_z()
+                    
+                
+                    _last_obs = new_obs
 
-                replay_buffer.add(obs = _last_original_obs, next_obs = new_obs, action  =action, reward =  reward_, done = done)
-    
-                _last_obs = new_obs
-                # Save the unnormalized observation
-          
+                context = model.sample_context(i , buff = model.RBList_eval)
+                model.actor.infer_posterior( context )
 
-
-        if done:
+        
             total_episodes += 1
             #episode_num += 1
             episode_rewards.append(episode_reward)
-            #total_timesteps.append(episode_timesteps)
+            episode_reward = 0.0
+        #total_timesteps.append(episode_timesteps)
 
             # Log training infos
            # if log_interval is not None and self._episode_num % log_interval == 0:

@@ -79,6 +79,11 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         learning_rate: Union[float, Callable],
         buffer_size: int = int(1e6),
         learning_starts: int = 100,
+        
+        n_traintasks: int = 0,
+        n_evaltasks: int = 0,
+        n_epochtasks: int = 0,
+        
         batch_size: int = 256,
         tau: float = 0.005,
         gamma: float = 0.99,
@@ -150,17 +155,61 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             self.policy_kwargs["use_sde"] = self.use_sde
         # For gSDE only
         self.use_sde_at_warmup = use_sde_at_warmup
-
+        print('###############################################')
+        print('###############     CONFIG     ################')
+        print('######## n_traintasks: ',n_traintasks,'###########')
+        print('######## n_evaltasks: ',n_evaltasks,'###########')
+        print('######## n_epochtasks: ',n_epochtasks,'###########')
+        print('###############################################')
+        
+        self.n_traintasks = n_traintasks
+        self.n_evaltasks = n_evaltasks
+        self.n_epochtasks = n_epochtasks
+        
+        self.initial_experience = False
+        
     def _setup_model(self) -> None:
         self._setup_lr_schedule()
         self.set_random_seed(self.seed)
-        self.replay_buffer = ReplayBuffer(
+        
+        self.RBList_replay = [None] * self.n_traintasks
+        self.RBList_encoder = [None] * self.n_traintasks
+        self.RBList_eval = [None] * self.n_evaltasks
+        
+        for i in range(self.n_traintasks):
+            self.RBList_replay[i] = ReplayBuffer(
             self.buffer_size,
             self.observation_space,
             self.action_space,
             self.device,
             optimize_memory_usage=self.optimize_memory_usage,
         )
+        
+        for i in range(self.n_traintasks):
+            self.RBList_encoder[i] = ReplayBuffer(
+            self.buffer_size,
+            self.observation_space,
+            self.action_space,
+            self.device,
+            optimize_memory_usage=self.optimize_memory_usage,
+        )
+        
+        for i in range(self.n_evaltasks):
+            self.RBList_eval[i] = ReplayBuffer(
+            self.buffer_size,
+            self.observation_space,
+            self.action_space,
+            self.device,
+            optimize_memory_usage=self.optimize_memory_usage,
+        )
+        
+ #       self.replay_buffer = ReplayBuffer(
+  #          self.buffer_size,
+   #         self.observation_space,
+    #        self.action_space,
+     #       self.device,
+      #      optimize_memory_usage=self.optimize_memory_usage,
+       # )
         self.policy = self.policy_class(
             self.observation_space,
             self.action_space,
@@ -247,34 +296,102 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         callback.on_training_start(locals(), globals())
         print('rollout')
         i=0
-        while self.num_timesteps < total_timesteps:
-            i=i+1
-            rollout = self.collect_rollouts(
-                self.env,
-                n_episodes=self.n_episodes_rollout,
-                n_steps=self.train_freq,
-                action_noise=self.action_noise,
-                callback=callback,
-                learning_starts=self.learning_starts,
-                replay_buffer=self.replay_buffer,
-                log_interval=log_interval,
-            )
+#        self.actor.clear_z()
+#        self.env.reset()
+        num_steps_prior= 3*200
+        num_extra_rl_steps_posterior = 3
+        self.train_freq = 200
+        
+        curr = 0
+        
+        if self.initial_experience == False:
+            print('Collecting initial experience')
+            for task_id in range(self.n_traintasks):
+                self.env.envs[0].reset_task(task_id)
+                self.actor.clear_z()
+                for i in range(10):#
+                    self.env.reset()
 
-            if rollout.continue_training is False:
-                break
+                    rollout = self.collect_rollouts(
+                        self.env,
+                        n_episodes=self.n_episodes_rollout,
+                        n_steps=self.train_freq,
+                        action_noise=self.action_noise,
+                        callback=callback,
+                        learning_starts=self.learning_starts,
+                        replay_buffer=[self.RBList_replay[task_id],self.RBList_encoder[task_id]],
+                        log_interval=log_interval,
+                    )
 
-#            if self.num_timesteps > 0 and self.num_timesteps > self.learning_starts:
-                # If no `gradient_steps` is specified,
-                # do as many gradients steps as steps performed during the rollout
-#                gradient_steps = self.gradient_steps if self.gradient_steps > 0 else rollout.episode_timesteps
-#                self.train(batch_size=self.batch_size, gradient_steps=gradient_steps)
-            if (i % (10* 200)) == 0:
-                print('apply grads')
-                gradient_steps =2000#self.gradient_steps
-                self.train(batch_size=self.batch_size, gradient_steps=gradient_steps)
+                    self.actor.sample_z()
+            self.initial_experience = True
+            print('collecting initial exp done')
+            self.num_timesteps = 0
+        
+        
+        for n in range(self.n_epochtasks):
+        
+            idx = np.random.randint(self.n_traintasks)
+            self.RBList_encoder[idx].reset()
+            self.actor.clear_z()
+            self.env.envs[0].reset_task(idx)
+            self.train_freq = 200 
+            for k in range(2):
+
+                ##clear z somewhere??
+                self.env.reset()
+                            
+                        
+                rollout = self.collect_rollouts(
+                    self.env,
+                    n_episodes=self.n_episodes_rollout,
+                    n_steps=self.train_freq,
+                    action_noise=self.action_noise,
+                    callback=callback,
+                    learning_starts=self.learning_starts,
+                    replay_buffer=[self.RBList_replay[idx],self.RBList_encoder[idx]],
+                    log_interval=log_interval,
+                )
+                self.actor.sample_z()
+
+                if rollout.continue_training is False:
+                    break
+            
+            
+            self.train_freq = 200 #TODO: 1x 600=?????
+            self.actor.clear_z()
+            for kk in range(3):
+                self.env.reset()          
+                
+                rollout = self.collect_rollouts(
+                    self.env,
+                    n_episodes=self.n_episodes_rollout,
+                    n_steps=self.train_freq,
+                    action_noise=self.action_noise,
+                    callback=callback,
+                    learning_starts=self.learning_starts,
+                    replay_buffer=[self.RBList_replay[idx]],
+                    log_interval=log_interval,
+                )
+                self.actor.sample_z()
+                context = self.sample_context(idx)
+                self.actor.infer_posterior( context )
+
+                if rollout.continue_training is False:
+                    break
+
+                
+        print('apply grads')
+        gradient_steps =1#self.gradient_steps
+        for ts in range(200):
+            indices = np.random.choice(self.n_traintasks, 16)
+            context = self.sample_context(indices)
+            self.actor.infer_posterior( context )
+            self.train(batch_size=self.batch_size, gradient_steps=gradient_steps, indices = indices)
         
         
         callback.on_training_end()
+      
 
         
         
@@ -313,7 +430,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             # Note: when using continuous actions,
             # we assume that the policy uses tanh to scale the action
             # We use non-deterministic action in the case of SAC, for TD3, it does not matter
-            self.actor.clear_z()
+            
             unscaled_action, _ = self.predict(self._last_obs, deterministic=False)
 
         # Rescale the action from [low, high] to [-1, 1]
@@ -369,7 +486,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         n_steps: int = -1,
         action_noise: Optional[ActionNoise] = None,
         learning_starts: int = 0,
-        replay_buffer: Optional[ReplayBuffer] = None,
+        replay_buffer: Optional[List[ReplayBuffer]] = None,
         log_interval: Optional[int] = None,
     ) -> RolloutReturn:
         """
@@ -395,7 +512,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
 
         assert isinstance(env, VecEnv), "You must pass a VecEnv"
         assert env.num_envs == 1, "OffPolicyAlgorithm only support single environment"
-
+        
         if self.use_sde:
             self.actor.reset_noise()
 
@@ -413,7 +530,9 @@ class OffPolicyAlgorithm(BaseAlgorithm):
                     self.actor.reset_noise()
 
                 # Select action randomly or according to policy
-                action, buffer_action = self._sample_action(learning_starts, action_noise)
+                action, _ = self._sample_action(learning_starts, action_noise)
+
+                action = action[0]
 
                 # Rescale and perform action
                 new_obs, reward, done, infos = env.step(action)
@@ -443,8 +562,8 @@ class OffPolicyAlgorithm(BaseAlgorithm):
                     else:
                         # Avoid changing the original ones
                         self._last_original_obs, new_obs_, reward_ = self._last_obs, new_obs, reward
-
-                    replay_buffer.add(self._last_original_obs, new_obs_, buffer_action, reward_, done)
+                    for RB in replay_buffer:
+                        RB.add(self._last_original_obs, new_obs_, action, reward_, done)
 
                 self._last_obs = new_obs
                 # Save the unnormalized observation
@@ -460,6 +579,10 @@ class OffPolicyAlgorithm(BaseAlgorithm):
                 self._on_step()
 
                 if 0 < n_steps <= total_steps:
+                    total_episodes += 1
+                    self._episode_num += 1
+                    episode_rewards.append(episode_reward)
+                    total_timesteps.append(episode_timesteps)
                     break
 
             if done:
