@@ -347,7 +347,8 @@ if __name__ == "__main__":
         "model_name",
         help="Path to model folder. If already exists, configurations will be loaded from this folder and training will resume from checkpoint.",
     )
-    parser.add_argument("num-envs", help="Number of processes for environments.")
+    parser.add_argument("num_envs", help="Number of processes for environments.")
+
     parser.add_argument(
         "--env-config-path",
         required=False,

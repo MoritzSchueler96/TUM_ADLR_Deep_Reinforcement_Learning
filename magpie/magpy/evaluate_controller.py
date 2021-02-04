@@ -87,7 +87,9 @@ def evaluate_model_on_set(
     :param timestep: (int) What timestep results are written to when using tensorboard logging
     :return: (dict) the metrics computed for the evaluated controller on the test set
     """
-    scenarios = list(np.load(set_path, allow_pickle=True))
+    scenarios = list(
+        np.load(set_path, allow_pickle=True)
+    )  # TODO: target (pitch, roll, Va) is fix in scenarios
     scenario_count = len(scenarios)
 
     if config_kw is None:
@@ -100,7 +102,11 @@ def evaluate_model_on_set(
                 "on_success": "done",
                 "success_streak_fraction": 1,
                 "success_streak_req": 100,
-                "states": {0: {"bound": 5}, 1: {"bound": 5}, 2: {"bound": 2}},
+                "states": {
+                    0: {"bound": 5},
+                    1: {"bound": 5},
+                    2: {"bound": 2},
+                },  # TODO: make dynamic
             },
         }
     )
