@@ -14,6 +14,8 @@ class FixedWingAircraft(gym.Env):
     def __init__(
         self,
         config_path,
+        task={}, 
+        n_tasks=2,
         sampler=None,
         sim_config_path=None,
         sim_parameter_path=None,
@@ -81,7 +83,7 @@ class FixedWingAircraft(gym.Env):
         self.integration_window = self.cfg.get("integration_window", 0)
         self.viewer = None
 
-        self.np_random = np.random.RandomState()
+#        self.np_random = np.random.RandomState()
         self.obs_norm_mean_mask = []
         self.obs_norm = self.cfg["observation"].get("normalize", False)
         self.obs_module_indices = {"pi": [], "vf": []}
@@ -297,6 +299,29 @@ class FixedWingAircraft(gym.Env):
         self.use_curriculum = True
         self.set_curriculum_level(1)
 
+        self._task = task
+        self.tasks = self.sample_tasks(n_tasks)
+        self._goal_vel = self.tasks[0].get('velocity', 0.0)
+        self._goal = self._goal_vel
+        self.all_goals = [-1]
+    
+    def sample_tasks(self, num_tasks):
+        np.random.seed(1337)
+        velocities = np.random.uniform(0.0, 3.0, size=(num_tasks,))
+        tasks = [{'velocity': velocity} for velocity in velocities]
+        return tasks
+
+    def get_all_task_idx(self):
+        return range(len(self.tasks))
+
+    def reset_task(self, idx):
+        self._task = self.tasks[idx]
+        self._goal_vel = self._task['velocity']
+        self._goal = self._goal_vel
+        print(self._goal, idx)
+        self.reset()
+
+
     def seed(self, seed=None):
         """
         Seed the random number generator of the flight simulator
@@ -433,6 +458,7 @@ class FixedWingAircraft(gym.Env):
             "observation": [obs],
             "target": {k: [v] for k, v in self.target.items()},
             "error": {k: [self._get_error(k)] for k in self.target.keys()},
+
         }
 
         # reset goal status
@@ -547,6 +573,7 @@ class FixedWingAircraft(gym.Env):
             if resample_target or (
                 resample_every and self._steps_for_current_target >= resample_every
             ):
+                print('NOOOOOOOOOOOOOOOOOOOOOOO')
                 self.sample_target()
 
             for k, v in self._get_next_target().items():
@@ -627,6 +654,21 @@ class FixedWingAircraft(gym.Env):
         )
 
     def sample_target(self):
+        self.target = {}
+        self._target_props = {}
+        self.cfg["observation"]['noise'] = None
+        self._steps_for_current_target = 0 
+        import sys
+        sys.path.append('../libs/pyfly-fixed-wing-visualizer/')
+        from pyfly_fixed_wing_visualizer.pyfly_fixed_wing_visualizer import simrecorder
+
+        self.simulator.rec = simrecorder(self.steps_max)
+        self.target['roll'] = 0
+        self.target['pitch'] = 0
+        self.target['Va'] = 22
+        self.target['position_n'] = 20
+
+    def sample_target_old(self):
         """
         Set new random target.
         """

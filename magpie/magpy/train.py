@@ -21,7 +21,7 @@ print(res)
 if __name__ == "__main__":
 
     main(
-        model_name="test1",
+        model_name="mSAC__test1___",
         num_envs=4,
         env_config_path=startingDir,
         disable_curriculum=True,
