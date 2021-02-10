@@ -1,8 +1,10 @@
 import gym
+import sys
 
 import os
-
-from stable_baselines3 import PPO
+sys.path.append('../libs/pyfly-fixed-wing-visualizer/')
+sys.path.append('../libs/stable-baselines3/')
+from stable_baselines3.stable_baselines3 import PPO
 from stable_baselines3 import SAC
 from stable_baselines3 import mSAC
 from stable_baselines3.common.evaluation import evaluate_policy, evaluate_meta_policy
@@ -18,14 +20,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 import mpl_toolkits.mplot3d.axes3d as p3
 import matplotlib.animation as animation
-import sys
-sys.path.append('../libs/pyfly-fixed-wing-visualizer/')
+
 from pyfly_fixed_wing_visualizer.pyfly_fixed_wing_visualizer import simrecorder
 th.manual_seed(42)
 np.random.seed(666)
 
 ########################################################################################################################################################
-
+# TODO: fly to next point, no wind
+#       next: fly to next point (10 mtrs) + Wind
+#       next: fly to 2 pts
+#       reward: delta distanz zum zielpunkt = geschwindigkeit
+#       reward: differenz wischen aktuellem heading und goal heading
+#       timer: szenario ende von intern triggern, i.e. zu weit von pfad weg
+#       curriculum implementieren
 
 from pyfly.pyfly import PyFly
 import json
@@ -73,8 +80,8 @@ class FixedWingAircraft_simple(gym.Env):
        
         # iterate over observation states
 
-        self.rwd_vec =  ["position_n","position_e","position_d"]
-        self.targets = [200, 0, -50]
+        self.rwd_vec =  ["position_n","position_e","position_d","Va"]
+        self.targets = [200, 0, -50, 22]
 
         self.rwd_delta = [5]
 
@@ -87,10 +94,8 @@ class FixedWingAircraft_simple(gym.Env):
                     "omega_p",
                     "omega_q", 
                     "omega_r",
-                    "alpha",
-                    "beta",
-                    "elevator",
-                    "aileron", 
+                    "elevon_left",
+                    "elevon_right", 
                     "throttle",
                     "position_n",
                     "position_e",
@@ -119,7 +124,7 @@ class FixedWingAircraft_simple(gym.Env):
     
     def sample_tasks(self, num_tasks):
         np.random.seed(1337)
-        velocities = np.random.uniform(-0.5, 0.5, size=(num_tasks,))
+        velocities = np.zeros(num_tasks)#np.random.uniform(-0.5, 0.5, size=(num_tasks,))
         tasks = [{'roll': velocity} for velocity in velocities]
 
         return tasks
@@ -167,6 +172,8 @@ class FixedWingAircraft_simple(gym.Env):
         """
         # check if any action is nan
         assert not np.any(np.isnan(action))
+
+        #action[2] = abs(action[2])
 
         if self.simulator.cur_sim_step == 0:
             self.rec = simrecorder(self.steps_max)
@@ -256,12 +263,21 @@ class FixedWingAircraft_simple(gym.Env):
         # used
         reward = 0
 
-        for idx, meas in enumerate(self.rwd_vec):
-            val = -1* abs(self.simulator.state[meas].value - self.targets[idx]) #Always fly to 100,0,-50
-        
-            reward += val
+       # for idx, meas in enumerate(self.rwd_vec):
+       #     if self.targets[idx] != 0:
+       #         val = -0.02* ((self.simulator.state[meas].value - self.targets[idx])/(self.targets[idx]))**2 #Always fly to 100,0,-50
+       #     else:
+       #         val = -0.02* (self.simulator.state[meas].value - self.targets[idx])**2 #Always fly to 100,0,-50
+                
+       #     reward += val
+        curr_hgt = -1*self.simulator.state['position_d'].value
+        last_hgt = -1 * self.simulator.state['position_d'].history[-2]
 
-        reward -= np.sum(np.asarray(action)**2)   
+        # negatives delta zum vorherigen zeitschritt
+        #
+
+        reward = curr_hgt - last_hgt
+        #reward -= np.sum(np.asarray(action)**2)   
         return reward
 
     def get_observation(self):
@@ -286,13 +302,14 @@ class FixedWingAircraft_simple(gym.Env):
 
 
 
+import datetime
+#TODO: immer 12 AM
+filename = 'Msac__' + datetime.date.today().strftime("%H_%M%p__%B_%d_%Y") + 'simpol.txt'
 
 
+env = FixedWingAircraft_simple(config_path = "../libs/pyfly/pyfly/pyfly_config.json", n_tasks=130)
 
-
-env = FixedWingAircraft_simple(config_path = "../libs/pyfly/pyfly/pyfly_config.json", n_tasks=80)
-
-meta_model = mSAC('MlpPolicy', env, n_traintasks=50,n_evaltasks=30,n_epochtasks=5,verbose=1,policy_kwargs=dict(net_arch=[300, 300, 300], latent_dim = 5, hidden_sizes=[200,200,200]))#,learning_rate=0.0006)
+meta_model = mSAC('MlpPolicy', env, n_traintasks=100,n_evaltasks=30,n_epochtasks=5,verbose=1,policy_kwargs=dict(net_arch=[300, 300, 300], latent_dim = 5, hidden_sizes=[200,200,200]))#,learning_rate=0.0006)
 
 meta_reward = []
 meta_std = []
@@ -304,9 +321,9 @@ meta_model_mean_reward_before, meta_model_std_reward_before = evaluate_meta_poli
 meta_reward.append(meta_model_mean_reward_before)
 meta_std.append(meta_model_std_reward_before)
 
-import datetime
 
-filename = 'Msac__' + datetime.date.today().strftime("%I_%M%p__%B_%d_%Y") + '.txt'
+
+
 
 my_file = open(filename,"w+")
 with open(filename, "a") as myfile:
