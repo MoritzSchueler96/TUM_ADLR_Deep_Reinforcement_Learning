@@ -73,6 +73,7 @@ def evaluate_meta_policy(
     model: "base_class.BaseAlgorithm",
     env: Union[gym.Env, VecEnv],
     n_eval_episodes: int = 10,
+    add2buff = False,
     deterministic: bool = True,
     render: bool = False,
     callback: Optional[Callable] = None,
@@ -103,7 +104,7 @@ def evaluate_meta_policy(
 
     _last_obs = []
     total_episodes = 0
-    replay_buffer = model.replay_buffer
+
     continue_training = False
     num_timesteps = 0
     total_steps = 0
@@ -112,6 +113,9 @@ def evaluate_meta_policy(
 
     episode_rewards, episode_lengths = [], []
     reward = []
+
+    model.actor.clear_z()
+    
     for i in range(n_eval_episodes):
         # Avoid double reset, as VecEnv are reset automatically
         if not isinstance(env, VecEnv) or i == 0:
@@ -120,17 +124,17 @@ def evaluate_meta_policy(
         done, state = False, None
         episode_reward = 0.0
         episode_length = 0
+        model.actor.clear_z()
+        
+        env.reset_task(model.n_traintasks+i)
+        
+        model.RBList_eval[i].reset()
+        
+        
         while not done:
             with th.no_grad():
-
-                if replay_buffer.pos > 999:
-                    #print('z schould change')
-                    context = model.actor.sample_context(replay_buffer)
-                    #print(replay_buffer.observations.shape)
-                    model.actor.infer_posterior(context)
-                    
-                    model.actor.sample_z()
-                # Select action randomly or according to policy
+# when to resamp
+                
                 
                 action, buffer_action = model.actor.predict(obs, model.actor.z, deterministic=True) #none for deterministic
                 
@@ -153,13 +157,17 @@ def evaluate_meta_policy(
     
                 episode_reward += reward
 
-
-                replay_buffer.add(obs = _last_original_obs, next_obs = new_obs, action  =action, reward =  reward_, done = done)
+                
+                model.RBList_eval[i].add(obs = _last_original_obs, next_obs = new_obs, action  =action, reward =  reward_, done = done)
+    
+                context = model.sample_context(i , buff = model.RBList_eval)
+                model.actor.infer_posterior( context )
+                
     
                 _last_obs = new_obs
                 # Save the unnormalized observation
           
-
+                
 
         if done:
             total_episodes += 1

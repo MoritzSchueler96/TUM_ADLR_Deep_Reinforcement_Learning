@@ -2,9 +2,9 @@
   "dt": 0.01,
   "rho": 1.2250,
   "g": 9.81,
-  "wind_magnitude_min": 0,
-  "wind_magnitude_max": 0,
-  "turbulence": false,
+  "wind_magnitude_min": -8,
+  "wind_magnitude_max": 8,
+  "turbulence": true,
   "turbulence_intensity": "light",
   "turbulence_sim_length": 300,
   "variables": [

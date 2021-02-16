@@ -77,6 +77,11 @@ class mSAC(OffPolicyAlgorithm):
         learning_rate: Union[float, Callable] = 3e-4,
         buffer_size: int = int(1e6),
         learning_starts: int = 0,
+        
+        n_traintasks: int = 0,
+        n_evaltasks: int = 0,
+        n_epochtasks: int = 0,
+        
         batch_size: int = 256,
         tau: float = 0.005,
         gamma: float = 0.99,
@@ -107,6 +112,9 @@ class mSAC(OffPolicyAlgorithm):
             learning_rate,
             buffer_size,
             learning_starts,
+            n_traintasks,
+            n_evaltasks,
+            n_epochtasks,
             batch_size,
             tau,
             gamma,
@@ -134,6 +142,12 @@ class mSAC(OffPolicyAlgorithm):
         self.target_update_interval = target_update_interval
         self.ent_coef_optimizer = None
 
+        self.indices = None
+        self.context = None
+        
+        self.encodermap = None
+        self.replaymap = None
+        
         if _init_setup_model:
             self._setup_model()
 
@@ -174,11 +188,69 @@ class mSAC(OffPolicyAlgorithm):
         self.critic = self.policy.critic
         self.critic_target = self.policy.critic_target
         
-    
+    def sample_context(self, indices, buff = None):
+        ''' sample batch of context from a list of tasks from the replay buffer '''
+        # make method work given a single task index
+        if not hasattr(indices, '__iter__'):
+            indices = [indices]
+#        print('indices in contextsampling', indices)
 
-    def train(self, gradient_steps: int, batch_size: int = 64) -> None:
+        
+        final = th.zeros(len(indices),100,27)
+        
+      
+   #     print(indices)
+    #    print(self.encodermap['end'])
+     #   print(self.replaymap['end'])
+        if len(indices) >1:
+            
+            for i,idx in enumerate(indices):
+        
+                sample_pos = np.random.randint(self.RBList_encoder[idx].pos, size=(100))
+ 
+                sample = self.RBList_encoder[idx]._get_samples(sample_pos) 
+
+                final[i]=th.cat([sample.observations,sample.actions,sample.rewards], dim=1)
+        else:
+            if buff is not None:
+                sample_pos = np.random.randint(buff[indices[0]].pos, size=(100))
+ 
+                sample = buff[indices[0]]._get_samples(sample_pos) 
+
+                final=th.cat([sample.observations,sample.actions,sample.rewards], dim=1)           
+            
+            else:
+                sample_pos = np.random.randint(self.RBList_encoder[indices[0]].pos, size=(100))
+ 
+                sample = self.RBList_encoder[indices[0]]._get_samples(sample_pos) 
+
+                final=th.cat([sample.observations,sample.actions,sample.rewards], dim=1)
+            final = final.view(1, 100, 27)
+        return final
+        
+    def sample_context_atinference(self, indices=[], depth =200):
+        ''' sample batch of context from a list of tasks from the replay buffer '''
+        # make method work given a single task index
+        if not hasattr(indices, '__iter__'):
+            indices = [indices]
+#        print('indices in contextsampling', indices)
+
+        final = th.zeros(1,100,27)
+        
+        if depth == 0:
+            depth = 1
+
+        sample_pos = np.random.randint(depth, size=(100)) #FUCKING TODO
+           
+        sample = self.replay_buffer._get_samples(self.replay_buffer.pos - sample_pos)   
+
+        final=th.cat([sample.observations,sample.actions,sample.rewards], dim=1)
+        
+        return final
+
+    def train(self, gradient_steps: int, batch_size: int = 64, indices = []) -> None:
         # Update optimizers learning rate
-        optimizers = [self.actor.optimizer, self.actor.context_optimizer, self.critic.optimizer]
+        optimizers = [self.actor.optimizer, self.actor.context_optimizer, self.critic.optimizer] 
         if self.ent_coef_optimizer is not None:
             optimizers += [self.ent_coef_optimizer]
 
@@ -189,52 +261,74 @@ class mSAC(OffPolicyAlgorithm):
         actor_losses, critic_losses = [], []
         kl_losses = []
         l_z_means, l_z_vars = [], []
+             
+           
+        self.indices = indices  
         
-#        print('train-looop')
-
         for gradient_step in range(gradient_steps):
-            
-            context = self.actor.sample_context(self.replay_buffer, leaveout= (gradient_steps-gradient_step))
-        # Sample replay buffer
-        #    replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
-            pos = self.replay_buffer.pos - (gradient_steps-gradient_step) 
-            indices = np.random.randint(pos, size=(batch_size))
-            replay_data = self.replay_buffer._get_samples(indices)
-            
         
+           
+            
+            
+            self.context = self.sample_context(self.indices)#(gradient_steps-gradient_step))
+#            print('performing gradient Step')
+            # Sample replay buffer
+            obs = th.zeros(16,batch_size,20)
+            next_observations = th.zeros(16,batch_size,20)
+            actions = th.zeros(16,batch_size,6)
+            rewards = th.zeros(16,batch_size,1)
+            dones = th.zeros(16,batch_size,1)
+
+            for i,idx in enumerate(self.indices):
         
+                sample_pos = np.random.randint(self.RBList_replay[idx].pos,size=(batch_size))
+ 
+                sample = self.RBList_replay[idx]._get_samples(sample_pos) 
+
+
+                obs[i]=sample.observations
+                next_observations[i]=sample.next_observations
+                actions[i]=sample.actions
+                rewards[i]=sample.rewards
+                dones[i]=sample.dones
+#            print('obs[0][0][0]',obs[0][0][0], obs.shape) 
+#            print('obs[0][0][0]',next_observations[0][0][0], next_observations.shape) 
+                   
             # We need to sample because `log_std` may have changed between two gradient steps
             if self.use_sde:
                 self.actor.reset_noise()        
         
-        
-        
-        
-#####################################################################################################
             # run inference in networks
-            self.actor.infer_posterior(context)
+            self.actor.infer_posterior(self.context)
             self.actor.sample_z()
             task_z = self.actor.z
             
+#            print('z_before:', task_z)
+            
+            t, b, _ = obs.size()
+#            print(t, b)
+            obs = obs.view(t * b, -1)
+            next_observations = next_observations.view(t * b, -1)
+            rewards = rewards.view(t * b, -1)
+            dones = dones.view(t * b, -1)
+            actions = actions.view(t * b, -1)
+            
+            task_z = [z.repeat(b, 1) for z in task_z]
+            task_z = th.cat(task_z, dim=0)
+            
+#            print('task_z',task_z, task_z.shape)
+                         
+            # logging
             local_means = self.actor.z_means.clone().detach().numpy()
             local_vars = self.actor.z_vars.clone().detach().numpy()
             l_z_means.append(local_means)
             l_z_vars.append(local_vars)
             
             
-            #'meta-batch' always one, future TODO?
-            b, t = replay_data.observations.size()
-#            print(b,t)
-            obs = replay_data.observations#.view(t * b, -1)
-            task_z = [z.repeat(b, 1) for z in task_z]
-            task_z = th.cat(task_z, dim=0)
-#            print(task_z.shape)
-#            print(task_z)
             # run policy, get log probs and new actions
-            
-            actions_pi, log_prob = self.actor.action_log_prob(replay_data.observations, task_z.detach()) #TODO: should this z be detached or no??
+            actions_pi, log_prob = self.actor.action_log_prob(obs, task_z.clone().detach())
             log_prob = log_prob.reshape(-1, 1)
-
+#            print(actions_pi, actions_pi.shape)
 
             ent_coef_loss = None
             if self.ent_coef_optimizer is not None:
@@ -255,33 +349,45 @@ class mSAC(OffPolicyAlgorithm):
                 self.ent_coef_optimizer.zero_grad()
                 ent_coef_loss.backward()
                 self.ent_coef_optimizer.step()
+                
+                
+                
+            # KL constraint on z if probabilistic
+            self.actor.context_optimizer.zero_grad()
+            kl_div = self.actor.compute_kl_div()
+            kl_loss = 0.1 * kl_div
+            kl_loss.backward(retain_graph=True)
+            kl_losses.append(kl_loss.clone().detach().numpy())    
+                
 
             with th.no_grad():
                 # Select action according to policy
-                next_actions, next_log_prob = self.actor.action_log_prob(replay_data.next_observations, task_z.detach())
+                next_actions, next_log_prob = self.actor.action_log_prob(next_observations, task_z.clone().detach())
                 # Compute the target Q value: min over all critics targets
                 
-                next_actions_and_z = th.cat([next_actions, task_z.detach()], dim=1)
-                targets = th.cat(self.critic_target(replay_data.next_observations, next_actions_and_z), dim=1)
+                next_actions_and_z = th.cat([next_actions, task_z.clone().detach()], dim=1)
+                targets = th.cat(self.critic_target(next_observations, next_actions_and_z), dim=1)
                 target_q, _ = th.min(targets, dim=1, keepdim=True)
                 # add entropy term
+                
+#                print(target_q.shape)
+                
                 target_q = target_q - ent_coef * next_log_prob.reshape(-1, 1)
                 # td error + entropy term
-                q_backup = replay_data.rewards + (1 - replay_data.dones) * self.gamma * target_q
+#                print(target_q.shape)
+#                print(rewards.shape)
+#                print(dones.shape)
+                
+                q_backup = ( rewards * 5) + (1 - dones) * self.gamma * target_q
 
             # Q and V networks
             # encoder will only get gradients from Q nets
             # Get current Q estimates for each critic network
             # using action from the replay buffer
-            actions_and_z = th.cat([replay_data.actions, task_z], dim=1)
-            current_q_estimates = self.critic(replay_data.observations, actions_and_z)
+            actions_and_z = th.cat([actions, task_z], dim=1)
+            current_q_estimates = self.critic(obs, actions_and_z)
            
-            # KL constraint on z if probabilistic
-            self.actor.context_optimizer.zero_grad()
-            kl_div = self.actor.compute_kl_div()
-            kl_loss = 1 * kl_div
-            kl_loss.backward(retain_graph=True)
-            kl_losses.append(kl_loss.detach().numpy())
+            
 
             
 
@@ -300,8 +406,8 @@ class mSAC(OffPolicyAlgorithm):
             #Compute actor loss
             # Alternative: actor_loss = th.mean(log_prob - qf1_pi)
             # Mean over all critic networks
-            own_actions_and_z = th.cat([actions_pi, task_z.detach()], dim=1)
-            q_values_pi = th.cat(self.critic.forward(replay_data.observations, own_actions_and_z), dim=1)
+            own_actions_and_z = th.cat([actions_pi, task_z.clone().detach()], dim=1)
+            q_values_pi = th.cat(self.critic.forward(obs, own_actions_and_z), dim=1)
             min_qf_pi, _ = th.min(q_values_pi, dim=1, keepdim=True)
             actor_loss = (ent_coef * log_prob - min_qf_pi).mean()
             actor_losses.append(actor_loss.item())
@@ -310,6 +416,8 @@ class mSAC(OffPolicyAlgorithm):
             self.actor.optimizer.zero_grad()
             actor_loss.backward()
             self.actor.optimizer.step()
+            
+            self.actor.detach_z()
 
             # Update target networks
             if gradient_step % self.target_update_interval == 0:

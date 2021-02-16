@@ -103,7 +103,7 @@ def evaluate_meta_policy(
 
     _last_obs = []
     total_episodes = 0
-    replay_buffer = model.replay_buffer
+
     continue_training = False
     num_timesteps = 0
     total_steps = 0
@@ -112,64 +112,41 @@ def evaluate_meta_policy(
 
     episode_rewards, episode_lengths = [], []
     reward = []
+
+    model.actor.clear_z()
+    num_exp_traj_eval=1
+    
     for i in range(n_eval_episodes):
-        # Avoid double reset, as VecEnv are reset automatically
-        if not isinstance(env, VecEnv) or i == 0:
-            obs = th.Tensor(env.reset())
-            _last_obs = obs
-        done, state = False, None
-        episode_reward = 0.0
-        episode_length = 0
-        while not done:
-            with th.no_grad():
+        with th.no_grad():
+            for r in range(1):
+                            
 
-                if replay_buffer.pos > 999:
-                    #print('z schould change')
-                    context = model.actor.sample_context(replay_buffer)
-                    #print(replay_buffer.observations.shape)
-                    model.actor.infer_posterior(context)
-                    
-                    model.actor.sample_z()
-                # Select action randomly or according to policy
-                
-                action, buffer_action = model.actor.predict(obs, model.actor.z, deterministic=True) #none for deterministic
-                
-                
-                # Rescale and perform action   
-                new_obs, reward, done, infos = env.step(action)
-                obs = th.Tensor(new_obs)
-                
-                    
-               
-                if model._vec_normalize_env is not None: ##delete? TODO
-                    new_obs_ = model._vec_normalize_env.get_original_obs()
-                    reward_ = model._vec_normalize_env.get_original_reward()
+                task_idx = model.n_traintasks+i
+                env.reset_task(task_idx)
 
-                else:
-                    # Avoid changing the original ones
-                    _last_original_obs, new_obs_, reward_ = _last_obs, new_obs, reward
+                model.actor.clear_z()
+                paths = []
+                num_transitions = 0
+                num_trajs = 0
 
-                # Only stop training if return value is False, not when it is None.
-    
-                episode_reward += reward
+                model.JUST_EVAL.reset()
 
+                while num_transitions < 600:
+                    num = model.obtain_samples(deterministic=True, max_samples=600 - num_transitions, max_trajs=1, accum_context=True, replaybuffers = [model.JUST_EVAL])
+                    num_transitions += num
+                    num_trajs += 1
+                    if num_trajs >= num_exp_traj_eval:
+                        model.actor.infer_posterior(model.actor.context)
 
-                replay_buffer.add(obs = _last_original_obs, next_obs = new_obs, action  =action, reward =  reward_, done = done)
-    
-                _last_obs = new_obs
-                # Save the unnormalized observation
-          
+        
 
+        
 
-        if done:
-            total_episodes += 1
-            #episode_num += 1
-            episode_rewards.append(episode_reward)
-            #total_timesteps.append(episode_timesteps)
+        
+                rwd = model.JUST_EVAL.rewards[range(model.JUST_EVAL.pos)]
+                episode_rewards.append(np.sum(rwd)/3)
+                total_episodes += 1
 
-            # Log training infos
-           # if log_interval is not None and self._episode_num % log_interval == 0:
-           #     self._dump_logs()
     std_reward = np.std(episode_rewards) if total_episodes > 0 else 0.0
     mean_reward = np.mean(episode_rewards) if total_episodes > 0 else 0.0
     return mean_reward, std_reward
