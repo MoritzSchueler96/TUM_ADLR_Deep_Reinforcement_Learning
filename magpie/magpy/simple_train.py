@@ -7,6 +7,13 @@ from stable_baselines3 import SAC
 from stable_baselines3 import mSAC
 from stable_baselines3.common.evaluation import evaluate_policy, evaluate_meta_policy
 
+from stable_baselines3.common.vec_env import (
+    SubprocVecEnv,
+    VecCheckNan,
+    DummyVecEnv,
+    VecNormalize,
+)
+
 import numpy as np
 import torch as th
 from gym import spaces
@@ -26,13 +33,13 @@ from pyfly_fixed_wing_visualizer.pyfly_fixed_wing_visualizer import simrecorder
 # np.random.seed(666)
 
 ########################################################################################################################################################
-# TODO: fly to next point, no wind
+# NOTE: fly to next point, no wind
 #       next: fly to next point (10 mtrs) + Wind
 #       next: fly to 2 pts
 #       reward: delta distanz zum zielpunkt = geschwindigkeit
 #       reward: differenz wischen aktuellem heading und goal heading
 #       timer: szenario ende von intern triggern, i.e. zu weit von pfad weg
-#       curriculum implementieren
+#       curriculum implementieren ( XX epochs no wind, reset replay buffers (keep weights--> reset buffer fkt), XX epochs some wind , .... )
 
 import json
 import copy
@@ -233,6 +240,7 @@ class FixedWingAircraft_simple(gym.Env):
             "position_e",
             "position_d",
         ]
+
         obs_low = np.ones(len(self.obs_vec)) * -np.inf
         obs_high = np.ones(len(self.obs_vec)) * np.inf
 
@@ -510,7 +518,16 @@ os.makedirs(model_folder)
 os.makedirs(model_folder, "logs")
 file = os.path.join(model_folder, "logs/simpol.txt")
 
-env = make_env(config_path=os.path.join(configDir, "pyfly_config.json"), n_tasks=130)
+# env = make_env(config_path=os.path.join(configDir, "pyfly_config.json"), n_tasks=130)
+
+env = VecNormalize(
+    SubprocVecEnv(
+        [
+            make_env(config_path, i, info_kw=info_kw, sim_config_kw=sim_config_kw)
+            for i in range(num_cpu)
+        ]
+    )
+)
 
 meta_model = mSAC(
     "MlpPolicy",
