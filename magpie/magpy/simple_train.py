@@ -522,10 +522,7 @@ file = os.path.join(model_folder, "logs/simpol.txt")
 
 env = VecNormalize(
     SubprocVecEnv(
-        [
-            make_env(config_path, i, info_kw=info_kw, sim_config_kw=sim_config_kw)
-            for i in range(num_cpu)
-        ]
+        make_env(config_path=os.path.join(configDir, "pyfly_config.json"), n_tasks=130)
     )
 )
 
