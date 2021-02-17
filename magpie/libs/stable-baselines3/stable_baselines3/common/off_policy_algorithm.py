@@ -79,11 +79,9 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         learning_rate: Union[float, Callable],
         buffer_size: int = int(1e6),
         learning_starts: int = 100,
-        
         n_traintasks: int = 0,
         n_evaltasks: int = 0,
         n_epochtasks: int = 0,
-        
         batch_size: int = 256,
         tau: float = 0.005,
         gamma: float = 0.99,
@@ -155,61 +153,61 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             self.policy_kwargs["use_sde"] = self.use_sde
         # For gSDE only
         self.use_sde_at_warmup = use_sde_at_warmup
-        print('###############################################')
-        print('###############     CONFIG     ################')
-        print('######## n_traintasks: ',n_traintasks,'###########')
-        print('######## n_evaltasks: ',n_evaltasks,'###########')
-        print('######## n_epochtasks: ',n_epochtasks,'###########')
-        print('###############################################')
-        
+        print("###############################################")
+        print("###############     CONFIG     ################")
+        print("######## n_traintasks: ", n_traintasks, "###########")
+        print("######## n_evaltasks: ", n_evaltasks, "###########")
+        print("######## n_epochtasks: ", n_epochtasks, "###########")
+        print("###############################################")
+
         self.n_traintasks = n_traintasks
         self.n_evaltasks = n_evaltasks
         self.n_epochtasks = n_epochtasks
         self._n_env_steps_total = 0
         self.initial_experience = False
-        
+
     def _setup_model(self) -> None:
         self._setup_lr_schedule()
         self.set_random_seed(self.seed)
-        
+
         self.RBList_replay = [None] * self.n_traintasks
         self.RBList_encoder = [None] * self.n_traintasks
         self.RBList_eval = [None] * self.n_evaltasks
-        
+
         for i in range(self.n_traintasks):
             self.RBList_replay[i] = ReplayBuffer(
-            self.buffer_size,
-            self.observation_space,
-            self.action_space,
-            self.device,
-            optimize_memory_usage=self.optimize_memory_usage,
-        )
-        
+                self.buffer_size,
+                self.observation_space,
+                self.action_space,
+                self.device,
+                optimize_memory_usage=self.optimize_memory_usage,
+            )
+
         for i in range(self.n_traintasks):
             self.RBList_encoder[i] = ReplayBuffer(
-            self.buffer_size,
-            self.observation_space,
-            self.action_space,
-            self.device,
-            optimize_memory_usage=self.optimize_memory_usage,
-        )
-        
+                self.buffer_size,
+                self.observation_space,
+                self.action_space,
+                self.device,
+                optimize_memory_usage=self.optimize_memory_usage,
+            )
+
         for i in range(self.n_evaltasks):
             self.RBList_eval[i] = ReplayBuffer(
-            self.buffer_size,
-            self.observation_space,
-            self.action_space,
-            self.device,
-            optimize_memory_usage=self.optimize_memory_usage,
-        )
+                self.buffer_size,
+                self.observation_space,
+                self.action_space,
+                self.device,
+                optimize_memory_usage=self.optimize_memory_usage,
+            )
 
         base_length = 500
 
-        self.num_initial_steps = 10*base_length
+        self.num_initial_steps = 10 * base_length
         self.num_train_steps_per_itr = 2000
-        self.num_steps_prior = 2*base_length
+        self.num_steps_prior = 2 * base_length
         self.num_steps_posterior = 0
-        self.num_extra_rl_steps_posterior = 3*base_length
+        self.num_extra_rl_steps_posterior = 3 * base_length
         self.update_post_train = 1
         self.num_iterations = 500
         self.num_tasks_sample = 5
@@ -219,27 +217,28 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         self._n_train_steps_total = 0
 
         from stable_baselines3.common.preprocessing import get_action_dim
+
         self.act_dim = get_action_dim(self.action_space)
 
         self.obs_dim = self.observation_space.shape[0]
 
         self.JUST_EVAL = ReplayBuffer(
-                    self.buffer_size,
-                    self.observation_space,
-                    self.action_space,
-                    self.device,
-                    optimize_memory_usage=self.optimize_memory_usage,
-                )
+            self.buffer_size,
+            self.observation_space,
+            self.action_space,
+            self.device,
+            optimize_memory_usage=self.optimize_memory_usage,
+        )
 
-        self.callback = print('')
-        
- #       self.replay_buffer = ReplayBuffer(
-  #          self.buffer_size,
-   #         self.observation_space,
-    #        self.action_space,
-     #       self.device,
-      #      optimize_memory_usage=self.optimize_memory_usage,
-       # )
+        self.callback = print("")
+
+        #       self.replay_buffer = ReplayBuffer(
+        #          self.buffer_size,
+        #         self.observation_space,
+        #        self.action_space,
+        #       self.device,
+        #      optimize_memory_usage=self.optimize_memory_usage,
+        # )
         self.policy = self.policy_class(
             self.observation_space,
             self.action_space,
@@ -248,7 +247,9 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         )
         self.policy = self.policy.to(self.device)
 
-    def save_replay_buffer(self, path: Union[str, pathlib.Path, io.BufferedIOBase]) -> None:
+    def save_replay_buffer(
+        self, path: Union[str, pathlib.Path, io.BufferedIOBase]
+    ) -> None:
         """
         Save the replay buffer as a pickle file.
 
@@ -258,14 +259,18 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         assert self.replay_buffer is not None, "The replay buffer is not defined"
         save_to_pkl(path, self.replay_buffer, self.verbose)
 
-    def load_replay_buffer(self, path: Union[str, pathlib.Path, io.BufferedIOBase]) -> None:
+    def load_replay_buffer(
+        self, path: Union[str, pathlib.Path, io.BufferedIOBase]
+    ) -> None:
         """
         Load a replay buffer from a pickle file.
 
         :param path: Path to the pickled replay buffer.
         """
         self.replay_buffer = load_from_pkl(path, self.verbose)
-        assert isinstance(self.replay_buffer, ReplayBuffer), "The replay buffer must inherit from ReplayBuffer class"
+        assert isinstance(
+            self.replay_buffer, ReplayBuffer
+        ), "The replay buffer must inherit from ReplayBuffer class"
 
     def _setup_learn(
         self,
@@ -303,7 +308,14 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             self.replay_buffer.dones[pos] = True
 
         return super()._setup_learn(
-            total_timesteps, eval_env, callback, eval_freq, n_eval_episodes, log_path, reset_num_timesteps, tb_log_name
+            total_timesteps,
+            eval_env,
+            callback,
+            eval_freq,
+            n_eval_episodes,
+            log_path,
+            reset_num_timesteps,
+            tb_log_name,
         )
 
     def learn(
@@ -320,18 +332,21 @@ class OffPolicyAlgorithm(BaseAlgorithm):
     ) -> "OffPolicyAlgorithm":
 
         total_timesteps, self.callback = self._setup_learn(
-            total_timesteps, eval_env, callback, eval_freq, n_eval_episodes, eval_log_path, reset_num_timesteps, tb_log_name
+            total_timesteps,
+            eval_env,
+            callback,
+            eval_freq,
+            n_eval_episodes,
+            eval_log_path,
+            reset_num_timesteps,
+            tb_log_name,
         )
         callback = self.callback
         callback.on_training_start(locals(), globals())
 
-
-
-        '''
+        """
         meta-training loop
-        '''
-
-        
+        """
 
         for it_ in range(1):
             if it_ == 0 and self.initial_experience == False:
@@ -340,11 +355,11 @@ class OffPolicyAlgorithm(BaseAlgorithm):
                 self.actor.sample_z()
                 self.actor.context = None
 
-                print('collecting initial pool of data for train and eval')
+                print("collecting initial pool of data for train and eval")
                 # temp for evaluating
                 for idx in range(self.n_traintasks):
                     self.task_idx = idx
-                    self.env.envs[0].reset_task(self.task_idx)
+                    self.env.env_method("reset_task", self.task_idx)
                     self.collect_data(self.num_initial_steps, 1, np.inf)
                 self.initial_experience = True
             # Sample data from train tasks.
@@ -361,31 +376,43 @@ class OffPolicyAlgorithm(BaseAlgorithm):
                     self.collect_data(self.num_steps_prior, 1, np.inf)
                 # collect some trajectories with z ~ posterior
                 if self.num_steps_posterior > 0:
-                    self.collect_data(self.num_steps_posterior, 1, self.update_post_train)
+                    self.collect_data(
+                        self.num_steps_posterior, 1, self.update_post_train
+                    )
                 # even if encoder is trained only on samples from the prior, the policy needs to learn to handle z ~ posterior
                 if self.num_extra_rl_steps_posterior > 0:
-                    self.collect_data(self.num_extra_rl_steps_posterior, 1, self.update_post_train, add_to_enc_buffer=False)
+                    self.collect_data(
+                        self.num_extra_rl_steps_posterior,
+                        1,
+                        self.update_post_train,
+                        add_to_enc_buffer=False,
+                    )
 
             # Sample train tasks and compute gradient updates on parameters.
-            print('apply grads')
+            print("apply grads")
             for train_step in range(self.num_train_steps_per_itr):
                 indices = np.random.choice(self.n_traintasks, self.meta_batch)
                 self._do_training(indices)
                 self._n_train_steps_total += 1
 
-                print('----- ', train_step ,' -----')
-                
+                print("----- ", train_step, " -----")
+
             self._dump_logs()
             self.ent_coef_losses, self.ent_coefs = [], []
             self.actor_losses, self.critic_losses = [], []
             self.kl_losses = []
             self.l_z_means, self.l_z_vars = [], []
-        
-        callback.on_training_end()
-      
 
-    def collect_data(self, num_samples, resample_z_rate, update_posterior_rate, add_to_enc_buffer=True):
-        '''
+        callback.on_training_end()
+
+    def collect_data(
+        self,
+        num_samples,
+        resample_z_rate,
+        update_posterior_rate,
+        add_to_enc_buffer=True,
+    ):
+        """
         get trajectories from current env in batch mode with given policy
         collect complete trajectories until the number of collected transitions >= num_samples
 
@@ -394,25 +421,32 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         :param resample_z_rate: how often to resample latent context z (in units of trajectories)
         :param update_posterior_rate: how often to update q(z | c) from which z is sampled (in units of trajectories)
         :param add_to_enc_buffer: whether to add collected data to encoder replay buffer
-        '''
+        """
         # start from the prior
         self.actor.clear_z()
 
         num_transitions = 0
         while num_transitions < num_samples:
             if add_to_enc_buffer:
-                n_samples = self.obtain_samples(max_samples=num_samples - num_transitions,
-                                                                max_trajs=update_posterior_rate,
-                                                                accum_context=False,
-                                                                resample=resample_z_rate,
-                                                                replaybuffers=[self.RBList_replay[self.task_idx],self.RBList_encoder[self.task_idx]])
+                n_samples = self.obtain_samples(
+                    max_samples=num_samples - num_transitions,
+                    max_trajs=update_posterior_rate,
+                    accum_context=False,
+                    resample=resample_z_rate,
+                    replaybuffers=[
+                        self.RBList_replay[self.task_idx],
+                        self.RBList_encoder[self.task_idx],
+                    ],
+                )
             else:
-                n_samples = self.obtain_samples(max_samples=num_samples - num_transitions,
-                                                                max_trajs=update_posterior_rate,
-                                                                accum_context=False,
-                                                                resample=resample_z_rate,
-                                                                replaybuffers=[self.RBList_replay[self.task_idx]])
-            
+                n_samples = self.obtain_samples(
+                    max_samples=num_samples - num_transitions,
+                    max_trajs=update_posterior_rate,
+                    accum_context=False,
+                    resample=resample_z_rate,
+                    replaybuffers=[self.RBList_replay[self.task_idx]],
+                )
+
             if update_posterior_rate != np.inf:
                 context = self.sample_context(self.task_idx)
                 self.actor.infer_posterior(context)
@@ -420,39 +454,47 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             num_transitions += n_samples
 
         self._n_env_steps_total += num_transitions
-       
 
-    def obtain_samples(self, deterministic=False, max_samples=np.inf, max_trajs=np.inf, accum_context=True, resample=1, replaybuffers = []):
+    def obtain_samples(
+        self,
+        deterministic=False,
+        max_samples=np.inf,
+        max_trajs=np.inf,
+        accum_context=True,
+        resample=1,
+        replaybuffers=[],
+    ):
         """
         Obtains samples in the environment until either we reach either max_samples transitions or
         num_traj trajectories.
         The resample argument specifies how often (in trajectories) the agent will resample it's context.
         """
-        assert max_samples < np.inf or max_trajs < np.inf, "either max_samples or max_trajs must be finite"
-        
+        assert (
+            max_samples < np.inf or max_trajs < np.inf
+        ), "either max_samples or max_trajs must be finite"
+
         n_steps_total = 0
         n_trajs = 0
         while n_steps_total < max_samples and n_trajs < max_trajs:
             # save the latent context that generated this trajectory
             rollout = self.collect_rollouts(
-                    self.env,
-                    n_episodes=1,
-                    n_steps=self.max_path_length,
-                    action_noise=self.action_noise,
-                    callback=self.callback,
-                    learning_starts=self.learning_starts,
-                    replay_buffer=replaybuffers,
-                    log_interval=None,
-                    accum_context=accum_context
-                )
+                self.env,
+                n_episodes=1,
+                n_steps=self.max_path_length,
+                action_noise=self.action_noise,
+                callback=self.callback,
+                learning_starts=self.learning_starts,
+                replay_buffer=replaybuffers,
+                log_interval=None,
+                accum_context=accum_context,
+            )
             n_steps_total += self.max_path_length
             n_trajs += 1
             # don't we also want the option to resample z ever transition?
             if n_trajs % resample == 0:
                 self.actor.sample_z()
         return n_steps_total
-        
-        
+
     def train(self, gradient_steps: int, batch_size: int) -> None:
         """
         Sample the replay buffer and do the updates
@@ -478,14 +520,16 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             The two differs when the action space is not normalized (bounds are not [-1, 1]).
         """
         # Select action randomly or according to policy
-        if self.num_timesteps < learning_starts and not (self.use_sde and self.use_sde_at_warmup):
+        if self.num_timesteps < learning_starts and not (
+            self.use_sde and self.use_sde_at_warmup
+        ):
             # Warmup phase
             unscaled_action = np.array([self.action_space.sample()])
         else:
             # Note: when using continuous actions,
             # we assume that the policy uses tanh to scale the action
             # We use non-deterministic action in the case of SAC, for TD3, it does not matter
-            
+
             unscaled_action, _ = self.predict(self._last_obs, deterministic=False)
 
         # Rescale the action from [low, high] to [-1, 1]
@@ -512,10 +556,20 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         fps = int(self.num_timesteps / (time.time() - self.start_time))
         logger.record("time/episodes", self._episode_num, exclude="tensorboard")
         if len(self.ep_info_buffer) > 0 and len(self.ep_info_buffer[0]) > 0:
-            logger.record("rollout/ep_rew_mean", safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer]))
-            logger.record("rollout/ep_len_mean", safe_mean([ep_info["l"] for ep_info in self.ep_info_buffer]))
+            logger.record(
+                "rollout/ep_rew_mean",
+                safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer]),
+            )
+            logger.record(
+                "rollout/ep_len_mean",
+                safe_mean([ep_info["l"] for ep_info in self.ep_info_buffer]),
+            )
         logger.record("time/fps", fps)
-        logger.record("time/time_elapsed", int(time.time() - self.start_time), exclude="tensorboard")
+        logger.record(
+            "time/time_elapsed",
+            int(time.time() - self.start_time),
+            exclude="tensorboard",
+        )
         logger.record("time/total timesteps", self.num_timesteps, exclude="tensorboard")
         if self.use_sde:
             logger.record("train/std", (self.actor.get_std()).mean().item())
@@ -568,7 +622,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
 
         assert isinstance(env, VecEnv), "You must pass a VecEnv"
         assert env.num_envs == 1, "OffPolicyAlgorithm only support single environment"
-        
+
         if self.use_sde:
             self.actor.reset_noise()
         try:
@@ -584,15 +638,18 @@ class OffPolicyAlgorithm(BaseAlgorithm):
 
             while not done:
 
-                if self.use_sde and self.sde_sample_freq > 0 and total_steps % self.sde_sample_freq == 0:
+                if (
+                    self.use_sde
+                    and self.sde_sample_freq > 0
+                    and total_steps % self.sde_sample_freq == 0
+                ):
                     # Sample a new noise matrix
                     self.actor.reset_noise()
 
                 # Select action randomly or according to policy
-                a, agent_info = self.actor.get_action(th.Tensor(o).reshape(-1,1,1))
+                a, agent_info = self.actor.get_action(th.Tensor(o).reshape(-1, 1, 1))
 
-                #disable for mujoco:
-                
+                # disable for mujoco:
 
                 # Rescale and perform action
                 next_o, reward, done, infos = env.step([a])
@@ -608,7 +665,9 @@ class OffPolicyAlgorithm(BaseAlgorithm):
                     callback.update_locals(locals())
                     # Only stop training if return value is False, not when it is None.
                     if callback.on_step() is False:
-                        return RolloutReturn(0.0, total_steps, total_episodes, continue_training=False)
+                        return RolloutReturn(
+                            0.0, total_steps, total_episodes, continue_training=False
+                        )
                 except:
                     pass
 
@@ -618,14 +677,17 @@ class OffPolicyAlgorithm(BaseAlgorithm):
                 self._update_info_buffer(infos, done)
 
                 # Store data in replay buffer
-                if replay_buffer is not None:           
+                if replay_buffer is not None:
                     for RB in replay_buffer:
-                        RB.add(obs = o, next_obs = next_o, action = a, reward = reward, done = done)
+                        RB.add(
+                            obs=o, next_obs=next_o, action=a, reward=reward, done=done
+                        )
 
-                o = next_o                # Save the unnormalized observation
-                
+                o = next_o  # Save the unnormalized observation
 
-                self._update_current_progress_remaining(self.num_timesteps, self._total_timesteps+1)
+                self._update_current_progress_remaining(
+                    self.num_timesteps, self._total_timesteps + 1
+                )
 
                 # For DQN, check if the target network should be updated
                 # and update the exploration schedule
@@ -658,4 +720,6 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             callback.on_rollout_end()
         except:
             pass
-        return RolloutReturn(mean_reward, total_steps, total_episodes, continue_training)
+        return RolloutReturn(
+            mean_reward, total_steps, total_episodes, continue_training
+        )
