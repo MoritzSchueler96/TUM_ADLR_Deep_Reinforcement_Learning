@@ -237,6 +237,7 @@ class simrecorder:
             if epoch == None:
                 epoch = '???'
             
+            #FIX
             name = 'Msac__' + datetime.date.today().strftime("%I_%M%p__%B_%d_%Y") + str(epoch) + '.avi'
 
             out = cv2.VideoWriter(name,cv2.VideoWriter_fourcc(*'DIVX'), 20, size)

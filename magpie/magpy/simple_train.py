@@ -4,7 +4,7 @@ import sys
 import os
 sys.path.append('../libs/pyfly-fixed-wing-visualizer/')
 sys.path.append('../libs/stable-baselines3/')
-from stable_baselines3.stable_baselines3 import PPO
+from stable_baselines3 import PPO
 from stable_baselines3 import SAC
 from stable_baselines3 import mSAC
 from stable_baselines3.common.evaluation import evaluate_policy, evaluate_meta_policy
@@ -26,13 +26,13 @@ th.manual_seed(42)
 np.random.seed(666)
 
 ########################################################################################################################################################
-# TODO: fly to next point, no wind
+# NOTE: fly to next point, no wind
 #       next: fly to next point (10 mtrs) + Wind
 #       next: fly to 2 pts
 #       reward: delta distanz zum zielpunkt = geschwindigkeit
 #       reward: differenz wischen aktuellem heading und goal heading
 #       timer: szenario ende von intern triggern, i.e. zu weit von pfad weg
-#       curriculum implementieren
+#       curriculum implementieren ( XX epochs no wind, reset replay buffers (keep weights--> reset buffer fkt), XX epochs some wind , .... )
 
 from pyfly.pyfly import PyFly
 import json
@@ -100,6 +100,7 @@ class FixedWingAircraft_simple(gym.Env):
                     "position_n",
                     "position_e",
                     "position_d"]
+
         obs_low = np.ones(len(self.obs_vec)) * -np.inf
         obs_high = np.ones(len(self.obs_vec)) * np.inf
 
@@ -270,7 +271,7 @@ class FixedWingAircraft_simple(gym.Env):
        #         val = -0.02* (self.simulator.state[meas].value - self.targets[idx])**2 #Always fly to 100,0,-50
                 
        #     reward += val
-        curr_hgt = -1*self.simulator.state['position_d'].value
+        curr_hgt = -1 * self.simulator.state['position_d'].value
         last_hgt = -1 * self.simulator.state['position_d'].history[-2]
 
         # negatives delta zum vorherigen zeitschritt

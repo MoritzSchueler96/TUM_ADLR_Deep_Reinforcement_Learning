@@ -73,12 +73,12 @@ def evaluate_meta_policy(
     model: "base_class.BaseAlgorithm",
     env: Union[gym.Env, VecEnv],
     n_eval_episodes: int = 10,
-    add2buff = False,
     deterministic: bool = True,
     render: bool = False,
     callback: Optional[Callable] = None,
     reward_threshold: Optional[float] = None,
     return_episode_rewards: bool = False,
+    epoch: int = None,
 ) -> Union[Tuple[float, float], Tuple[List[float], List[int]]]:
     """
     Runs policy for ``n_eval_episodes`` episodes and returns average reward.
@@ -115,69 +115,41 @@ def evaluate_meta_policy(
     reward = []
 
     model.actor.clear_z()
+    num_exp_traj_eval=1
     
     for i in range(n_eval_episodes):
-        # Avoid double reset, as VecEnv are reset automatically
-        if not isinstance(env, VecEnv) or i == 0:
-            obs = th.Tensor(env.reset())
-            _last_obs = obs
-        done, state = False, None
-        episode_reward = 0.0
-        episode_length = 0
-        model.actor.clear_z()
-        
-        env.reset_task(model.n_traintasks+i)
-        
-        model.RBList_eval[i].reset()
-        
-        
-        while not done:
-            with th.no_grad():
-# when to resamp
-                
-                
-                action, buffer_action = model.actor.predict(obs, model.actor.z, deterministic=True) #none for deterministic
-                
-                
-                # Rescale and perform action   
-                new_obs, reward, done, infos = env.step(action)
-                obs = th.Tensor(new_obs)
-                
-                    
-               
-                if model._vec_normalize_env is not None: ##delete? TODO
-                    new_obs_ = model._vec_normalize_env.get_original_obs()
-                    reward_ = model._vec_normalize_env.get_original_reward()
+        with th.no_grad():
+            for r in range(1):
+                            
 
-                else:
-                    # Avoid changing the original ones
-                    _last_original_obs, new_obs_, reward_ = _last_obs, new_obs, reward
+                task_idx = model.n_traintasks+i
+                env.reset_task(task_idx)
 
-                # Only stop training if return value is False, not when it is None.
+                model.actor.clear_z()
+                paths = []
+                num_transitions = 0
+                num_trajs = 0
+
+                model.JUST_EVAL.reset()
+
+                while num_transitions < 1500:
+                    num = model.obtain_samples(deterministic=True, max_samples=1500 - num_transitions, max_trajs=1, accum_context=True, replaybuffers = [model.JUST_EVAL])
+                    num_transitions += num
+                    num_trajs += 1
+                    if num_trajs >= num_exp_traj_eval:
+                        model.actor.infer_posterior(model.actor.context)
+
+        
+
+        
+
+        
+                rwd = model.JUST_EVAL.rewards[range(model.JUST_EVAL.pos)]
+                episode_rewards.append(np.sum(rwd)/3)
+                total_episodes += 1
     
-                episode_reward += reward
-
-                
-                model.RBList_eval[i].add(obs = _last_original_obs, next_obs = new_obs, action  =action, reward =  reward_, done = done)
+    env.render(epoch = epoch)
     
-                context = model.sample_context(i , buff = model.RBList_eval)
-                model.actor.infer_posterior( context )
-                
-    
-                _last_obs = new_obs
-                # Save the unnormalized observation
-          
-                
-
-        if done:
-            total_episodes += 1
-            #episode_num += 1
-            episode_rewards.append(episode_reward)
-            #total_timesteps.append(episode_timesteps)
-
-            # Log training infos
-           # if log_interval is not None and self._episode_num % log_interval == 0:
-           #     self._dump_logs()
     std_reward = np.std(episode_rewards) if total_episodes > 0 else 0.0
     mean_reward = np.mean(episode_rewards) if total_episodes > 0 else 0.0
     return mean_reward, std_reward
