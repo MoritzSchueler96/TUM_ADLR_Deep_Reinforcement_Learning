@@ -196,16 +196,6 @@
         "sign": -1
       },
       {
-        "name": "position_n",
-        "class": "state",
-        "type": "error",
-        "function_class": "linear",
-        "scaling": 1,
-        "shaping": true,
-        "max": 0.3,
-        "sign": -1
-      },
-      {
         "name": "pitch",
         "class": "state",
         "type": "error",
@@ -283,24 +273,24 @@
         "name": "omega_p",
         "init_min": -60,
         "init_max": 60,
-        "constraint_min": -999999999,
-        "constraint_max": 999999999,
+        "constraint_min": -720,
+        "constraint_max": 720,
         "convert_to_radians": true
       },
       {
         "name": "omega_q",
         "init_min": -60,
         "init_max": 60,
-        "constraint_min": -999999999,
-        "constraint_max": 999999999,
+        "constraint_min": -720,
+        "constraint_max": 720,
         "convert_to_radians": true
       },
       {
         "name": "omega_r",
         "init_min": -60,
         "init_max": 60,
-        "constraint_min": -999999999,
-        "constraint_max": 999999999,
+        "constraint_min": -720,
+        "constraint_max": 720,
         "convert_to_radians": true
       }
     ]

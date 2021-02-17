@@ -6,7 +6,7 @@ import os
 startingDir = os.path.dirname(os.path.realpath(__file__))
 print(startingDir)
 os.chdir(startingDir)
-examplesDir = "../libs/fixed-wing-gym/gym_fixed_wing/examples/"
+examplesDir = "../../libs/fixed-wing-gym/gym_fixed_wing/examples/"
 print(examplesDir)
 
 import numpy as np
@@ -21,11 +21,11 @@ print(res)
 if __name__ == "__main__":
 
     main(
-        model_name="mSAC__test1___",
-        num_envs=4,
+        model_name="PPO2",
+        num_envs=2,
         env_config_path=startingDir,
         disable_curriculum=True,
         policy="MlpPolicy",
-        train_steps=3000000,
+        train_steps=1000000,
         test_data_path=examplesDir + "test_sets/test_set_wind_none_step20-20-3.npy",
     )
