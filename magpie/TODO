@@ -3,13 +3,22 @@ Todo:
   ✔ Bis Mi neuschreiben oder komplett übernehmen @done(20-12-05 00:24)
   ✔ Trajektorien controller Leon fragen @done(20-12-05 00:24)
   Mo:
-    ☐ Code kommentieren
+    ✔ Code kommentieren @done(21-02-17 15:43)
     ✔ Code debuggen -> Verständnis erhöhen @done(21-01-08 14:18)
     ✔ fixed wing gym zusammen mit pyfly zum laufen bringen -> paper ergebnis nachstellen @done(21-01-09 11:48)
-    ☐ Visualisierung von Patrick einbinden -> Speichern der Plots passt noch nicht
+    ✔ Visualisierung von Patrick einbinden -> Speichern der Plots passt noch nicht @done(21-02-17 15:44)
     ✘ Blockdiagram für Klassen & Methoden Pyfly @cancelled(21-01-12 23:33)
     ✔ Abgleichen wie Pyfly mit Oyster verbinden @done(21-01-08 14:18)
     ✔ Positionen in Pyfly einbauen @done(21-01-12 23:33)
+    ✔ relative Pfade @done(21-02-17 15:45)
+    ✔ datetime bei rendern fixen @done(21-02-17 15:45)
+    ✔ Reward calculation (weight vector passend zu reward name vektor) @done(21-02-17 15:45)
+    ✔ Recorder daten nicht speichern über skip variable (für evaluation) @done(21-02-17 15:46)
+    ☐ Ziel erreicht check (target bounding boxen)
+    ☐ reward scaling
+    ☐ tasks erstellen
+    ☐ task werte an pyfly übergeben und neues Ziel setzen
+    ☐ in init und reset sinnvolle Werte für idx und cur_pos festlegen
   
   Patrick:
     ✔ Visualisierung fertigstellen
@@ -18,6 +27,10 @@ Todo:
     ☐ Blockdiagram für Klassen & Methoden Oyster
     ☐ Oyster paper nachstellen
     ✔ Abgleichen wie Pyfly mit Oyster verbinden @done(21-01-08 14:18)
+    ☐ Tensorboard loggt nicht bei mSAC
+    ☐ Model.save schmiert ab bei mSAC
+    ☐ evaluate meta policy geht nicht
+    ☐ Visualizer geht nicht (line 312)
 
   Open:
     ☐ in Physik von UAVs einlesen
