@@ -245,7 +245,7 @@
       }
     ]
   },
-  // no idea what for?
+  // start conditions for pyfly simulator
   "simulator": {
     "states": [
       {
