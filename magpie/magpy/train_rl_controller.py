@@ -1,7 +1,4 @@
 import sys
-sys.path.append('../libs/pyfly-fixed-wing-visualizer/')
-from pyfly_fixed_wing_visualizer.pyfly_fixed_wing_visualizer import simrecorder
-
 import gym
 import numpy as np
 import torch
@@ -18,7 +15,7 @@ from stable_baselines3 import SAC
 from stable_baselines3 import mSAC
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
-#from stable_baselines3.common.logger import Image
+from stable_baselines3.common.logger import Image
 
 from gym_fixed_wing.fixed_wing import FixedWingAircraft
 from pyfly_fixed_wing_visualizer.pyfly_fixed_wing_visualizer import simrecorder
@@ -189,7 +186,7 @@ class TensorboardCallback(BaseCallback):
         return True
 
 
-def make_env(config_path, rank = 0, seed=0, info_kw=None, sim_config_kw=None):
+def make_env(config_path, rank=0, seed=0, info_kw=None, sim_config_kw=None):
     """
     Utility function for multiprocessed env.
 
@@ -274,8 +271,6 @@ def main(
             ]
         )
     )
-
-    env = VecNormalize(make_env(config_path, 0 , info_kw=info_kw, sim_config_kw=sim_config_kw))
 
     env.env_method("set_curriculum_level", curriculum_level)
     env.set_attr("training", True)
