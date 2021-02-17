@@ -38,7 +38,9 @@ def evaluate_policy(
         returns ([float], [int]) when ``return_episode_rewards`` is True
     """
     if isinstance(env, VecEnv):
-        assert env.num_envs == 1, "You must pass only one environment when using this function"
+        assert (
+            env.num_envs == 1
+        ), "You must pass only one environment when using this function"
 
     episode_rewards, episode_lengths = [], []
     for i in range(n_eval_episodes):
@@ -62,13 +64,15 @@ def evaluate_policy(
     mean_reward = np.mean(episode_rewards)
     std_reward = np.std(episode_rewards)
     if reward_threshold is not None:
-        assert mean_reward > reward_threshold, "Mean reward below threshold: " f"{mean_reward:.2f} < {reward_threshold:.2f}"
+        assert mean_reward > reward_threshold, (
+            "Mean reward below threshold: "
+            f"{mean_reward:.2f} < {reward_threshold:.2f}"
+        )
     if return_episode_rewards:
         return episode_rewards, episode_lengths
     return mean_reward, std_reward
-    
-    
-    
+
+
 def evaluate_meta_policy(
     model: "base_class.BaseAlgorithm",
     env: Union[gym.Env, VecEnv],
@@ -100,7 +104,7 @@ def evaluate_meta_policy(
         returns ([float], [int]) when ``return_episode_rewards`` is True
     """
 
-    #assert env.num_envs == 1, "OffPolicyAlgorithm only support single environment"
+    # assert env.num_envs == 1, "OffPolicyAlgorithm only support single environment"
 
     _last_obs = []
     total_episodes = 0
@@ -109,21 +113,25 @@ def evaluate_meta_policy(
     num_timesteps = 0
     total_steps = 0
     if isinstance(env, VecEnv):
-        assert env.num_envs == 1, "You must pass only one environment when using this function"
+        assert (
+            env.num_envs == 1
+        ), "You must pass only one environment when using this function"
 
     episode_rewards, episode_lengths = [], []
     reward = []
 
-    model.actor.clear_z()
-    num_exp_traj_eval=1
-    
+    model.actor.clear_z()  # geht nicht weiter als hier?
+    num_exp_traj_eval = 1
+
     for i in range(n_eval_episodes):
+        if i == len(n_eval_episodes):
+            env.env_method("set_skip", False)
+
         with th.no_grad():
             for r in range(1):
-                            
 
-                task_idx = model.n_traintasks+i
-                env.reset_task(task_idx)
+                task_idx = model.n_traintasks + i
+                env.env_method("reset_task", task_idx)
 
                 model.actor.clear_z()
                 paths = []
@@ -133,23 +141,25 @@ def evaluate_meta_policy(
                 model.JUST_EVAL.reset()
 
                 while num_transitions < 1500:
-                    num = model.obtain_samples(deterministic=True, max_samples=1500 - num_transitions, max_trajs=1, accum_context=True, replaybuffers = [model.JUST_EVAL])
+                    num = model.obtain_samples(
+                        deterministic=True,
+                        max_samples=1500 - num_transitions,
+                        max_trajs=1,
+                        accum_context=True,
+                        replaybuffers=[model.JUST_EVAL],
+                    )
                     num_transitions += num
                     num_trajs += 1
                     if num_trajs >= num_exp_traj_eval:
                         model.actor.infer_posterior(model.actor.context)
 
-        
-
-        
-
-        
                 rwd = model.JUST_EVAL.rewards[range(model.JUST_EVAL.pos)]
-                episode_rewards.append(np.sum(rwd)/3)
+                episode_rewards.append(np.sum(rwd) / 3)
                 total_episodes += 1
-    
-    env.render(epoch = epoch)
-    
+
+    env.env_method("render", mode="other", epoch=epoch)
+    env.env_method("set_skip", True)
+
     std_reward = np.std(episode_rewards) if total_episodes > 0 else 0.0
     mean_reward = np.mean(episode_rewards) if total_episodes > 0 else 0.0
     return mean_reward, std_reward
