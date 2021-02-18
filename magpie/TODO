@@ -16,9 +16,9 @@ Todo:
     ✔ Recorder daten nicht speichern über skip variable (für evaluation) @done(21-02-17 15:46)
     ☐ Ziel erreicht check (target bounding boxen)
     ☐ reward scaling
-    ☐ tasks erstellen
-    ☐ task werte an pyfly übergeben und neues Ziel setzen
-    ☐ in init und reset sinnvolle Werte für idx und cur_pos festlegen
+    ✔ tasks erstellen @done(21-02-18 01:05)
+    ✔ task werte an pyfly übergeben und neues Ziel setzen @done(21-02-18 01:19)
+    ✔ in init und reset sinnvolle Werte für idx und cur_pos festlegen @done(21-02-18 01:19)
   
   Patrick:
     ✔ Visualisierung fertigstellen
