@@ -31,7 +31,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import mpl_toolkits.mplot3d.axes3d as p3
 import matplotlib.animation as animation
-
+sys.path.append('../libs/pyfly-fixed-wing-visualizer/')
 from pyfly_fixed_wing_visualizer.pyfly_fixed_wing_visualizer import simrecorder
 
 ########################################################################################################################################################
@@ -100,7 +100,7 @@ class TensorboardCallback(BaseCallback):
             ep_info_buf = self.locals["ep_info_buffer"]
         else:
             ep_info_buf = self.locals["self"].ep_info_buffer
-        if len(ep_info_buf) > 0 and ep_info_buf[-1] != last_ep_info:
+        if len(ep_info_buf) > 0:# and ep_info_buf[-1] != last_ep_info:
             last_ep_info = ep_info_buf[-1]
 
             now = time.time()
@@ -158,7 +158,7 @@ class TensorboardCallback(BaseCallback):
                 )
                 last_render = time.time()
 
-            if self.num_timesteps - last_test >= test_interval:
+            if False:#self.num_timesteps - last_test >= test_interval:
                 last_test = self.num_timesteps
                 evaluate_meta_policy(
                     model,
@@ -275,14 +275,15 @@ class FixedWingAircraft_simple(gym.Env):
         self.idx = 0
 
         self.tasks = self.sample_tasks(n_tasks)
-        self._goal_vel = self.tasks[0].get("roll", 0.0)
+        self.goal_vec = self.sample_task(0)
+        self._goal_vel = self.goal_vec[0]["roll"]
         self._goal = self._goal_vel
         self.all_goals = [-1]
 
         # skip rendering
         self.skip = False
 
-    def sample_tasks(num_tasks):
+    def sample_tasks(self, num_tasks):
         tasks = []
         taskDir = os.path.join(startingDir, "tasks")
         all_files = os.listdir(taskDir)
@@ -293,7 +294,7 @@ class FixedWingAircraft_simple(gym.Env):
 
         return tasks
 
-    def sample_task(id):
+    def sample_task(self, id):
         if id == self.idx and self.cur_pos < len(self.tasks[id]):
             self.cur_pos += 1
         elif id == self.idx:
@@ -301,10 +302,10 @@ class FixedWingAircraft_simple(gym.Env):
         else:
             self.cur_pos = 0
             self.idx = id
-        sample_target(id, self.cur_pos)
+        self.sample_target(id, self.cur_pos)
         return self.tasks[id]
 
-    def sample_target(id, pos):
+    def sample_target(self, id, pos):
         if pos == 0:
             start = self.tasks[id][pos]
             goal = self.tasks[id][pos + 1]
@@ -315,15 +316,15 @@ class FixedWingAircraft_simple(gym.Env):
         self.target = goal  # self._goal?
         self.rec = simrecorder(self.steps_max)
 
-    def get_all_task_idx(pself):
+    def get_all_task_idx(self):
         return range(len(self.tasks))
 
     def reset_task(self, idx):
-        self._task = self.sample_task(idx)
-
-        self._goal_vel = self._task["roll"]  # not needed anymore?
-        self._goal = self._goal_vel  # not needed anymore?
-        print(self._goal, idx)  # not needed anymore?
+        #self._task = self.sample_task(idx)
+        self.task = self.sample_target(idx, 0)
+        #self._goal_vel = self._task[0][idx]  # not needed anymore?
+        #self._goal = self._goal_vel  # not needed anymore?
+        #print(self._goal, idx)  # not needed anymore?
         self.reset()
 
     def seed(self, seed=None):
@@ -644,7 +645,8 @@ if __name__ == "__main__":
         )
     )
 
-    if False:
+    if True:
+        meta = True
         meta_model = mSAC(
             "MlpPolicy",
             env,
@@ -657,33 +659,42 @@ if __name__ == "__main__":
             ),
             tensorboard_log=os.path.join(model_folder, "tb"),
         )  # ,learning_rate=0.0006)
+
+        _, cb = meta_model._setup_learn(
+            5*500,eval_env=env, callback=TensorboardCallback()
+        )
+
+        meta_model.callback = cb
+
+
     else:
-        meta_model = PPO(
+        meta = False
+        model = PPO(
             "MlpPolicy",
             env,
             verbose=1,
             tensorboard_log=os.path.join(model_folder, "tb"),
         )
 
-    meta_reward = []
-    meta_std = []
+    reward = []
+    std = []
 
     print("-Start-")
     n_eval = 30
+    if meta:
+        model_mean_reward_before, model_std_reward_before = evaluate_meta_policy(meta_model, env, n_eval_episodes=n_eval, epoch=0)
+    else:
+        pass
+#        model_mean_reward_before, model_std_reward_before = evaluate_policy(model, env, n_eval_episodes=n_eval)
 
-    # meta_model_mean_reward_before, meta_model_std_reward_before = evaluate_meta_policy(meta_model, env, n_eval_episodes=n_eval, epoch=0)
-    meta_model_mean_reward_before = 3
-    meta_model_mean_reward = 5
-    meta_model_std_reward_before = 4
-    meta_model_std_reward = 2
-    meta_reward.append(meta_model_mean_reward_before)
-    meta_std.append(meta_model_std_reward_before)
+  #  reward.append(model_mean_reward_before)
+  #  std.append(model_std_reward_before)
 
     my_file = open(file, "w+")
     with open(file, "a") as myfile:
         myfile.write("epoch:" + str(0) + "\n")
-        myfile.write("meta_reward = " + str(meta_reward) + "\n")
-        myfile.write("meta_std = " + str(meta_std) + "\n")
+        myfile.write("meta_reward = " + str(reward) + "\n")
+        myfile.write("meta_std = " + str(std) + "\n")
         myfile.write(
             "================================================================================================\n\n"
         )
@@ -692,25 +703,34 @@ if __name__ == "__main__":
         "##################################Start Learning##################################"
     )
     for i in range(50):
+        if meta:
+            meta_model.learn(
+                total_timesteps=5 * 500,
+                callback=TensorboardCallback(),  # FIX creates new tb file each time called
+            )  # , eval_freq=100, n_eval_episodes=5, log_interval = 100)
 
-        meta_model.learn(
-            total_timesteps=5 * 500,
-            callback=TensorboardCallback(),  # FIX creates new tb file each time called
-        )  # , eval_freq=100, n_eval_episodes=5, log_interval = 100)
+            model_mean_reward, model_std_reward = evaluate_meta_policy(   meta_model, env, n_eval_episodes=n_eval, epoch=i + 1)
 
-        # meta_model_mean_reward, meta_model_std_reward = evaluate_meta_policy(    meta_model, env, n_eval_episodes=n_eval, epoch=i + 1)
+        else:
+            model.learn(
+                total_timesteps=5 * 500,
+                callback=TensorboardCallback(),  # FIX creates new tb file each time called
+            )  # , eval_freq=100, n_eval_episodes=5, log_interval = 100)
 
-        meta_reward.append(meta_model_mean_reward)
-        meta_std.append(meta_model_std_reward)
+            model_mean_reward, model_std_reward = evaluate_policy(model, env, n_eval_episodes=n_eval)
+
+
+        reward.append(model_mean_reward)
+        std.append(model_std_reward)
 
         print("epoch:", i)
-        print("meta_reward = ", meta_reward)
-        print("meta_std = ", meta_std)
+        print("meta_reward = ", reward)
+        print("meta_std = ", std)
 
         with open(file, "a") as myfile:
             myfile.write("epoch:" + str(i + 1) + "\n")
-            myfile.write("meta_reward = " + str(meta_reward) + "\n")
-            myfile.write("meta_std = " + str(meta_std) + "\n")
+            myfile.write("meta_reward = " + str(reward) + "\n")
+            myfile.write("meta_std = " + str(std) + "\n")
             myfile.write(
                 "================================================================================================\n\n"
             )
