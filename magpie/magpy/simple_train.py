@@ -269,6 +269,11 @@ class FixedWingAircraft_simple(gym.Env):
         )
 
         self._task = task
+
+        # choose starting task
+        self.cur_pos = 0
+        self.idx = 0
+
         self.tasks = self.sample_tasks(n_tasks)
         self._goal_vel = self.tasks[0].get("roll", 0.0)
         self._goal = self._goal_vel
@@ -297,6 +302,7 @@ class FixedWingAircraft_simple(gym.Env):
             self.cur_pos = 0
             self.idx = id
         sample_target(id, self.cur_pos)
+        return self.tasks[id]
 
     def sample_target(id, pos):
         if pos == 0:
@@ -305,16 +311,19 @@ class FixedWingAircraft_simple(gym.Env):
         else:
             start = self.tasks[id][pos - 1]
             goal = self.tasks[id][pos]
-        # TODO: init Pyfly and set states
+        self.simulator.reset(state=start)
+        self.target = goal  # self._goal?
+        self.rec = simrecorder(self.steps_max)
 
     def get_all_task_idx(pself):
         return range(len(self.tasks))
 
     def reset_task(self, idx):
-        self._task = self.tasks[idx]
-        self._goal_vel = self._task["roll"]
-        self._goal = self._goal_vel
-        print(self._goal, idx)
+        self._task = self.sample_task(idx)
+
+        self._goal_vel = self._task["roll"]  # not needed anymore?
+        self._goal = self._goal_vel  # not needed anymore?
+        print(self._goal, idx)  # not needed anymore?
         self.reset()
 
     def seed(self, seed=None):
@@ -342,6 +351,7 @@ class FixedWingAircraft_simple(gym.Env):
             os.path.join(configDir, "x8_param.mat"),
         )
 
+        # self.reset_task(id) ?
         self.simulator.reset(state={"roll": self._goal, "pitch": 0.0, "Wind": 1})
         # self.simulator.turbulence = True
         # self.simulator.turbulence_intensity = "light"
@@ -410,18 +420,6 @@ class FixedWingAircraft_simple(gym.Env):
         info = {"rew": reward}
 
         return obs, reward, done, info
-
-    def sample_target(self):
-        self.target = {}
-        self._target_props = {}
-        self.cfg["observation"]["noise"] = None
-        self._steps_for_current_target = 0
-
-        self.rec = simrecorder(self.steps_max)
-        self.target["roll"] = 0
-        self.target["pitch"] = 0
-        self.target["Va"] = 22
-        self.target["position_n"] = 20
 
     def set_skip(self, val):
         self.skip = val
