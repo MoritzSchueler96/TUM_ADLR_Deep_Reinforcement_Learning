@@ -138,7 +138,7 @@ for n in range(num_tasks):
         )
 
         angle = []
-        for n, v in enumerate(var):
+        for vnum, v in enumerate(var):
 
             # calculate pitch from direction vector between two points
             if v in ["pitch"]:
@@ -154,20 +154,20 @@ for n in range(num_tasks):
                         pitch = 0
                     else:
                         pitch = np.arccos(num / den)
-                    angles[p - 1][n] = pitch
+                    angles[p - 1][vnum] = pitch
                 else:
                     pitch = 0
                 angle.append(pitch)
 
             else:
                 if p != 0:
-                    prev = angles[p - 1][n]
+                    prev = angles[p - 1][vnum]
                 else:
                     prev = np.random.randint(
                         start[v]["min"] * precision, start[v]["max"] * precision, 1
                     )[0] / float(precision)
 
-                angle.append(prev + val[n] * scaling[n])
+                angle.append(prev + val[vnum] * scaling[vnum])
 
         angle = np.asarray(angle)
         angles.append(angle)
