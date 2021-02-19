@@ -18,11 +18,11 @@ def plot_task(coords, ball_radius):
     zs = np.take(coords, 2, axis=1)
 
     ax = fig.add_subplot(1, 1, 1, projection="3d")
-    ax.set_xlim3d([np.min(xs) - 2, np.max(xs) + 2])
+    ax.set_xlim3d([np.min(xs) - 15, np.max(xs) + 15])
     ax.set_xlabel("X")
-    ax.set_ylim3d([np.min(ys) - 2, np.max(ys) + 2])
+    ax.set_ylim3d([np.min(ys) - 15, np.max(ys) + 15])
     ax.set_ylabel("Y")
-    ax.set_zlim3d([np.min(zs) - 2, np.max(zs) + 2])
+    ax.set_zlim3d([np.min(zs) - 15, np.max(zs) + 15])
     ax.set_zlabel("Z")
 
     ax.set_title("")
@@ -40,13 +40,13 @@ def plot_task(coords, ball_radius):
             continue
         else:
             r = ball_radius
-            alpha = 0.3
+            alpha = 0.1
             u = np.linspace(0, 2 * np.pi, 100)
             v = np.linspace(0, np.pi, 100)
             x = r * np.outer(np.cos(u), np.sin(v)) + xs[i]
             y = r * np.outer(np.sin(u), np.sin(v)) + ys[i]
             z = r * np.outer(np.ones(np.size(u)), np.cos(v)) + zs[i]
-            sphere = ax.plot_surface(x, y, z, color="m", alpha=alpha)
+            ax.plot_surface(x, y, z, color="m", alpha=alpha)
 
     plt.show()
     return True
@@ -61,6 +61,15 @@ num_tasks = 200
 var = ["roll", "pitch", "Va"]
 scaling = [1, 1, 1]
 
+fix_start_dir = True
+start_dir = [1, 0, 0]
+precision = 10
+dist = 10  # distance between current coord and coord in same dir
+alpha = 0  # angle to edge of cutting circle (0-90 degrees)
+np.random.seed(10)
+plot = False
+save = True
+
 start = {
     "roll": {"min": -10, "max": 10},
     "pitch": {"min": -10, "max": 10},
@@ -69,12 +78,6 @@ start = {
     "position_e": {"min": -10, "max": 10},
     "position_d": {"min": 50, "max": 200},
 }
-
-precision = 10
-dist = 10  # distance between current coord and coord in same dir
-alpha = 30  # angle to edge of cutting circle
-np.random.seed(10)
-plot = False
 
 ball_radius = dist / np.cos(np.deg2rad(alpha))
 circle_radius = np.sqrt(ball_radius ** 2 - dist ** 2)
@@ -101,9 +104,12 @@ for n in range(num_tasks):
             coords.append(coord)
         else:
             if p == 1:
-                dir = np.random.randint(-10 * precision, 10 * precision, 3) / float(
-                    precision
-                )
+                if fix_start_dir:
+                    dir = start_dir
+                else:
+                    dir = np.random.randint(-10 * precision, 10 * precision, 3) / float(
+                        precision
+                    )
             else:
                 dir = np.subtract(coords[p - 1], coords[p - 2])
 
@@ -132,15 +138,36 @@ for n in range(num_tasks):
         )
 
         angle = []
-        for v in enumerate(var):
-            if p != 0:
-                prev = angles[p - 1][v[0]]
-            else:
-                prev = np.random.randint(
-                    start[v[1]]["min"] * precision, start[v[1]]["max"] * precision, 1
-                )[0] / float(precision)
+        for n, v in enumerate(var):
 
-            angle.append(prev + val[v[0]] * scaling[v[0]])
+            # calculate pitch from direction vector between two points
+            if v in ["pitch"]:
+                if p != 0:
+                    q = coords[p] - coords[p - 1]
+                    vp = np.copy(q)
+                    vp[2] = 0
+                    vpp = np.copy(vp)
+                    vpp[0] = 0
+                    num = np.dot(vp, vpp)
+                    den = np.linalg.norm(vp) * np.linalg.norm(vpp)
+                    if den == 0:
+                        pitch = 0
+                    else:
+                        pitch = np.arccos(num / den)
+                    angles[p - 1][n] = pitch
+                else:
+                    pitch = 0
+                angle.append(pitch)
+
+            else:
+                if p != 0:
+                    prev = angles[p - 1][n]
+                else:
+                    prev = np.random.randint(
+                        start[v]["min"] * precision, start[v]["max"] * precision, 1
+                    )[0] / float(precision)
+
+                angle.append(prev + val[n] * scaling[n])
 
         angle = np.asarray(angle)
         angles.append(angle)
@@ -153,8 +180,11 @@ for n in range(num_tasks):
             d[names[i]] = point[i]
 
         task.append(d)
+
     if plot:
         plot_task(coords, ball_radius)
+
     task = np.asarray(task)
-    name = "task_" + str(n)
-    np.save(os.path.join(taskDir, name), task)
+    if save:
+        name = "task_" + str(n)
+        np.save(os.path.join(taskDir, name), task)
