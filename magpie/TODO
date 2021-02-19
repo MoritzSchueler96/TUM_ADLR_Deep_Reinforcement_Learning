@@ -14,32 +14,34 @@ Todo:
     ✔ datetime bei rendern fixen @done(21-02-17 15:45)
     ✔ Reward calculation (weight vector passend zu reward name vektor) @done(21-02-17 15:45)
     ✔ Recorder daten nicht speichern über skip variable (für evaluation) @done(21-02-17 15:46)
-    ☐ Ziel erreicht check (target bounding boxen)
-    ☐ reward scaling
+    ✔ Ziel erreicht check (target bounding boxen) @done(21-02-19 16:06)
     ✔ tasks erstellen @done(21-02-18 01:05)
     ✔ task werte an pyfly übergeben und neues Ziel setzen @done(21-02-18 01:19)
     ✔ in init und reset sinnvolle Werte für idx und cur_pos festlegen @done(21-02-18 01:19)
+    ☐ reward scaling
+    ☐ Pyfly berechnet Va anstatt vorgegebenen Wert zu nehmen
   
   Patrick:
     ✔ Visualisierung fertigstellen
-    ☐ Code kommentieren
-    ☐ Code debuggen -> Verständnis erhöhen
-    ☐ Blockdiagram für Klassen & Methoden Oyster
-    ☐ Oyster paper nachstellen
+    ✔ Code kommentieren @done(21-02-19 16:11)
+    ✔ Code debuggen -> Verständnis erhöhen @done(21-02-19 16:11)
+    ✘ Blockdiagram für Klassen & Methoden Oyster @cancelled(21-02-19 16:11)
+    ✔ Oyster paper nachstellen @done(21-02-19 16:11)
     ✔ Abgleichen wie Pyfly mit Oyster verbinden @done(21-01-08 14:18)
-    ☐ Tensorboard loggt nicht bei mSAC
+    ✔ Tensorboard loggt nicht bei mSAC @done(21-02-19 16:10)
+    ✔ evaluate meta policy geht nicht @done(21-02-19 16:10)
     ☐ Model.save schmiert ab bei mSAC
-    ☐ evaluate meta policy geht nicht
-    ☐ Visualizer geht nicht (line 312)
+    ☐ Visualizer anpassen (Trajektorie plotten)
 
   Open:
     ☐ in Physik von UAVs einlesen
-    ☐ Von Punkt zu Punkt fliegen über verschiedene Config Files -> wenn Ziel erreicht nicht direkt weiterfliegen sondern auf exakten gerade erreichten Zielpunkt zurücksetzen, um randomness zu vermeiden
-    ☐ Trajektorien Controller schreiben -> buch von leon
-    ☐ Nach Messdaten zum Validieren fragen
-    ☐ Sensormodelle bauen
-    ☐ Plots bisschen auseinander ziehen, damit man sie gut lesen kann
+    ✘ Von Punkt zu Punkt fliegen über verschiedene Config Files -> wenn Ziel erreicht nicht direkt weiterfliegen sondern auf exakten gerade erreichten Zielpunkt zurücksetzen, um randomness zu vermeiden @cancelled(21-02-19 16:06)
+    ✘ Trajektorien Controller schreiben -> buch von leon @cancelled(21-02-19 16:06)
+    ✘ Nach Messdaten zum Validieren fragen @cancelled(21-02-19 16:06)
+    ✔ Plots bisschen auseinander ziehen, damit man sie gut lesen kann @done(21-02-19 16:10)
     ✔ maybe pyfly und fixed wing in mehrere files aufteilen? @done(21-01-08 14:18)
-    ☐ oyster mit pyfly verbinden und basic task lernen
+    ✔ oyster mit pyfly verbinden @done(21-02-19 16:10)
     ✔ in nbdev einarbeiten @done(21-01-12 23:32)
-    ☐ Milestone report schreiben + präsi
+    ☐ Sensormodelle bauen
+    ☐ basic task lernen
+    ☐ Paper schreiben + präsi
