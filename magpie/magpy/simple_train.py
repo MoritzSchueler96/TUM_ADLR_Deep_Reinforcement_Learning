@@ -322,10 +322,10 @@ class FixedWingAircraft_simple(gym.Env):
     def reset_task(self, idx):
         #self._task = self.sample_task(idx)
         self.task = self.sample_target(idx, 0)
+        self.idx = idx
         #self._goal_vel = self._task[0][idx]  # not needed anymore?
         #self._goal = self._goal_vel  # not needed anymore?
         #print(self._goal, idx)  # not needed anymore?
-        self.reset()
 
     def seed(self, seed=None):
         """
@@ -353,7 +353,7 @@ class FixedWingAircraft_simple(gym.Env):
         )
 
         # self.reset_task(id) ?
-        self.simulator.reset(state={"roll": self._goal, "pitch": 0.0, "Wind": 1})
+        self.reset_task(self.idx)
         # self.simulator.turbulence = True
         # self.simulator.turbulence_intensity = "light"
 
@@ -617,7 +617,7 @@ def save_model(model, save_folder):
     """
     model.env.save(os.path.join(save_folder, "env.pkl"))
     model.save(
-        os.path.join(save_folder, "model.pkl")
+        os.path.join(save_folder, "model.pkl"), include = ['actor', 'critic'], exclude=['JUST_EVAL', 'RBList_encoder', 'RBList_replay', 'RBList_eval', 'callback']
     )  # FIX failes somehow only for mSAC
 
 
@@ -645,6 +645,9 @@ if __name__ == "__main__":
         )
     )
 
+    cllbck = TensorboardCallback()
+
+
     if True:
         meta = True
         meta_model = mSAC(
@@ -661,7 +664,7 @@ if __name__ == "__main__":
         )  # ,learning_rate=0.0006)
 
         _, cb = meta_model._setup_learn(
-            5*500,eval_env=env, callback=TensorboardCallback()
+            5*500,eval_env=env, callback=cllbck
         )
 
         meta_model.callback = cb
@@ -682,7 +685,15 @@ if __name__ == "__main__":
     print("-Start-")
     n_eval = 30
     if meta:
+        save_model(meta_model, modelDir + modelname)
+        print(env)
+        meta_model = mSAC.load(os.path.join(modelDir + modelname, "model.pkl"))
+        meta_model.env = env
+        print(env)
+        print('done')
+        meta_model.callback = cllbck
         model_mean_reward_before, model_std_reward_before = evaluate_meta_policy(meta_model, env, n_eval_episodes=n_eval, epoch=0)
+        
     else:
         pass
 #        model_mean_reward_before, model_std_reward_before = evaluate_policy(model, env, n_eval_episodes=n_eval)
