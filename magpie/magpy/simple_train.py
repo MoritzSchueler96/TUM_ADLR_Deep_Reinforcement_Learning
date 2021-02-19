@@ -62,11 +62,11 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 
 # global variables
-render_interval = 5  # Time in seconds between rendering of training episodes
+render_interval = 500  # Time in seconds between rendering of training episodes
 test_interval = 500000
 last_test = 0
 last_render = time.time()
-checkpoint_save_interval = 300
+checkpoint_save_interval = 500000
 last_save = time.time()
 last_ep_info = None
 log_interval = 5
@@ -221,7 +221,6 @@ class FixedWingAircraft_simple(gym.Env):
         # self.simulator.turbulence_intensity = "light" #, "moderate", "severe".
 
         # init sim environment
-        self.history = None
         self.steps_count = None
         self._steps_for_current_target = None
         self.goal_achieved = False
@@ -233,7 +232,6 @@ class FixedWingAircraft_simple(gym.Env):
         self.rwd_vec = ["position_n", "position_e", "position_d", "Va"]
         self.rwd_weights = [1, 1, 1, 1]
         self.rwd_method = ["euclid", "euclid", "euclid", "abs"]
-        self.targets = [200, 0, -50, 22]
         self.target = {}
 
         self.rwd_delta = [5]
@@ -279,13 +277,20 @@ class FixedWingAircraft_simple(gym.Env):
         self._task = task
 
         # choose starting task
-        self.cur_pos = 0
-        self.idx = 0
+        self.cur_pos = -1
+        self.idx = -1
 
         self.tasks = self.sample_tasks(n_tasks)
         self._task = self.sample_task(0)
         self._goal = self._task[0]
-        self.all_goals = [-1]
+        self.goal_bounds = {
+            "position_n": 0.5,
+            "position_e": 0.5,
+            "position_d": 0.5,
+            "roll": 60,
+            "pitch": 25,
+            "Va": 6,
+        }
 
         # skip rendering
         self.skip = False
@@ -323,12 +328,8 @@ class FixedWingAircraft_simple(gym.Env):
         return self.tasks[id]
 
     def sample_target(self, id, pos):
-        if pos == 0:
-            start = self.tasks[id][pos]
-            goal = self.tasks[id][pos + 1]
-        else:
-            start = self.tasks[id][pos - 1]
-            goal = self.tasks[id][pos]
+        start = self.tasks[id][pos]
+        goal = self.tasks[id][pos + 1]
         self.simulator.reset(state=start)
         self._goal = goal
         self.rec = simrecorder(self.steps_max)
@@ -339,14 +340,12 @@ class FixedWingAircraft_simple(gym.Env):
 
     def reset_task(self, idx):
         self._task, _ = self.sample_target(idx, 0)
-        self.reset()
 
     def seed(self, seed=None):
         """
         Seed the random number generator of the flight simulator
         :param seed: (int) seed for random state
         """
-        # used
         self.np_random, seed = gym.utils.seeding.np_random(seed)
         self.simulator.seed(seed)
         return [seed]
@@ -366,9 +365,7 @@ class FixedWingAircraft_simple(gym.Env):
             os.path.join(configDir, "x8_param.mat"),
         )
 
-        self.simulator.reset(
-            state={"roll": self._goal["roll"], "pitch": 0.0, "Wind": 1}
-        )
+        self.reset_task(self.idx)  # or 0?
         # self.simulator.turbulence = True
         # self.simulator.turbulence_intensity = "light"
 
@@ -424,6 +421,7 @@ class FixedWingAircraft_simple(gym.Env):
 
         if step_success:
             goal_achieved_on_step = False
+            goal_status = []
 
             # save current state for visualization with pyfly fixed wing visualizer
             if not self.skip:
@@ -431,16 +429,21 @@ class FixedWingAircraft_simple(gym.Env):
                     self.rec.savestate(
                         self.simulator.state, self.simulator.cur_sim_step - 1
                     )
-            """        
+
             for state, status in self._get_goal_status().items():
                 self.history["goal"][state].append(status)
-            """
+                goal_status.append(status)
 
             for state, status in self._task[self.cur_pos + 1].items():
                 self.target[state] = status
                 self.history["target"][state].append(status)
-                self.history["goal"][state].append(0)  # just for testing purposes
                 # self.history["error"][state].append(self._get_error(status)) # get error?
+
+            if all(goal_status):
+                goal_achieved_on_step = True
+                self.sample_task(self.idx + 1)
+                self.goal_achieved = True
+                done = True
 
             # calculate reward  TODO: move down to get observation and appending?
             reward = self.get_reward(
@@ -468,6 +471,45 @@ class FixedWingAircraft_simple(gym.Env):
 
         return obs, reward, done, info
 
+    def _get_goal_status(self):
+        """
+        Get current status of whether the goal for each target state as specified by configuration is achieved.
+        :return: (dict) status for each and all target states
+        """
+        goal_status = {}
+        for state in self._goal.keys():
+            err = self._get_error(state)
+            goal_status[state] = np.abs(err) <= self.goal_bounds[state]
+
+        return goal_status
+
+    def _get_error(self, state):
+        """
+        Get difference between current value of state and target value.
+        :param state: (string) name of state
+        :return: (float) error
+        """
+        if state in ["pitch", "roll"]:
+            return self._get_angle_dist(
+                self._goal[state], self.simulator.state[state].value
+            )
+
+        else:
+            return self._goal[state] - self.simulator.state[state].value
+
+    def _get_angle_dist(self, ang1, ang2):
+        """
+        Get shortest distance between two angles in [-pi, pi].
+        :param ang1: (float) first angle
+        :param ang2: (float) second angle
+        :return: (float) distance between angles
+        """
+        dist = (ang2 - ang1 + np.pi) % (2 * np.pi) - np.pi
+        if dist < -np.pi:
+            dist += 2 * np.pi
+
+        return dist
+
     def save_history(self, path, states, save_targets=True):
         """
         Save environment state history to file.
@@ -475,7 +517,6 @@ class FixedWingAircraft_simple(gym.Env):
         :param states: (string or [string]) names of states to save
         :param save_targets: (bool) save targets
         """
-        # used
         self.simulator.save_history(path, states)
         if save_targets:
             res = np.load(path, allow_pickle=True).item()
@@ -550,9 +591,9 @@ class FixedWingAircraft_simple(gym.Env):
                     os.makedirs(os.path.dirname(save_path))
                 _, ext = os.path.splitext(save_path)
                 if ext != "":
-                    plt.savefig(save_path, bbox_inches="tight", format=ext[1:])
+                    plt.savefig(save_path, format=ext[1:])
                 else:
-                    plt.savefig(save_path, bbox_inches="tight")
+                    plt.savefig(save_path)
 
             if show:
                 plt.show(block=block)
@@ -590,7 +631,6 @@ class FixedWingAircraft_simple(gym.Env):
         Get the reward for the current state of the environment.
         :return: (float) reward
         """
-        # used
         reward = 0
 
         # idea on how to calc reward without scaling
@@ -633,7 +673,6 @@ class FixedWingAircraft_simple(gym.Env):
         Get the observation vector for current state of the environment.
         :return: ([float]) observation vector
         """
-        # used
         obs = []
 
         for obb in self.obs_vec:
