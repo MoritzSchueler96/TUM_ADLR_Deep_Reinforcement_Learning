@@ -2,6 +2,7 @@ import gym
 import sys
 
 import os
+
 from stable_baselines3 import PPO
 from stable_baselines3 import SAC
 from stable_baselines3 import mSAC
@@ -31,7 +32,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import mpl_toolkits.mplot3d.axes3d as p3
 import matplotlib.animation as animation
-sys.path.append('../libs/pyfly-fixed-wing-visualizer/')
+
 from pyfly_fixed_wing_visualizer.pyfly_fixed_wing_visualizer import simrecorder
 
 ########################################################################################################################################################
@@ -61,7 +62,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 
 # global variables
-render_interval = 50000  # Time in seconds between rendering of training episodes
+render_interval = 5  # Time in seconds between rendering of training episodes
 test_interval = 500000
 last_test = 0
 last_render = time.time()
@@ -78,7 +79,7 @@ info_kw = [
     "success_time_frac",
 ]
 info_kw = [
-    "rew",
+    "target",
 ]
 env = None
 model = None
@@ -100,7 +101,7 @@ class TensorboardCallback(BaseCallback):
             ep_info_buf = self.locals["ep_info_buffer"]
         else:
             ep_info_buf = self.locals["self"].ep_info_buffer
-        if len(ep_info_buf) > 0:# and ep_info_buf[-1] != last_ep_info:
+        if len(ep_info_buf) > 0 and ep_info_buf[-1] != last_ep_info:
             last_ep_info = ep_info_buf[-1]
 
             now = time.time()
@@ -158,7 +159,7 @@ class TensorboardCallback(BaseCallback):
                 )
                 last_render = time.time()
 
-            if False:#self.num_timesteps - last_test >= test_interval:
+            if False:  # self.num_timesteps - last_test >= test_interval:
                 last_test = self.num_timesteps
                 evaluate_meta_policy(
                     model,
@@ -233,6 +234,7 @@ class FixedWingAircraft_simple(gym.Env):
         self.rwd_weights = [1, 1, 1, 1]
         self.rwd_method = ["euclid", "euclid", "euclid", "abs"]
         self.targets = [200, 0, -50, 22]
+        self.target = {}
 
         self.rwd_delta = [5]
 
@@ -251,6 +253,12 @@ class FixedWingAircraft_simple(gym.Env):
             "position_n",
             "position_e",
             "position_d",
+        ]
+
+        self.act_vec = [
+            "elevon_left",
+            "elevon_right",
+            "throttle",
         ]
 
         obs_low = np.ones(len(self.obs_vec)) * -np.inf
@@ -275,13 +283,22 @@ class FixedWingAircraft_simple(gym.Env):
         self.idx = 0
 
         self.tasks = self.sample_tasks(n_tasks)
-        self.goal_vec = self.sample_task(0)
-        self._goal_vel = self.goal_vec[0]["roll"]
-        self._goal = self._goal_vel
+        self._task = self.sample_task(0)
+        self._goal = self._task[0]
         self.all_goals = [-1]
 
         # skip rendering
         self.skip = False
+
+        # init history
+        self.history = {
+            "action": [],
+            "reward": [],
+            "observation": [],
+            "target": {k: [v] for k, v in self._task[0].items()},
+            "error": [],  # {k: [self._get_error(k)] for k in self.target.keys()},
+            "goal": {k: [0] for k in self._task[0].keys()},
+        }
 
     def sample_tasks(self, num_tasks):
         tasks = []
@@ -313,18 +330,15 @@ class FixedWingAircraft_simple(gym.Env):
             start = self.tasks[id][pos - 1]
             goal = self.tasks[id][pos]
         self.simulator.reset(state=start)
-        self.target = goal  # self._goal?
+        self._goal = goal
         self.rec = simrecorder(self.steps_max)
+        return self.tasks[id], goal
 
     def get_all_task_idx(self):
         return range(len(self.tasks))
 
     def reset_task(self, idx):
-        #self._task = self.sample_task(idx)
-        self.task = self.sample_target(idx, 0)
-        #self._goal_vel = self._task[0][idx]  # not needed anymore?
-        #self._goal = self._goal_vel  # not needed anymore?
-        #print(self._goal, idx)  # not needed anymore?
+        self._task, _ = self.sample_target(idx, 0)
         self.reset()
 
     def seed(self, seed=None):
@@ -352,12 +366,21 @@ class FixedWingAircraft_simple(gym.Env):
             os.path.join(configDir, "x8_param.mat"),
         )
 
-        # self.reset_task(id) ?
-        self.simulator.reset(state={"roll": self._goal, "pitch": 0.0, "Wind": 1})
+        self.simulator.reset(
+            state={"roll": self._goal["roll"], "pitch": 0.0, "Wind": 1}
+        )
         # self.simulator.turbulence = True
         # self.simulator.turbulence_intensity = "light"
 
         obs = self.get_observation()
+        self.history = {
+            "action": [],
+            "reward": [],
+            "observation": [obs],
+            "target": {k: [v] for k, v in self._task[0].items()},
+            "error": [],  # {k: [self._get_error(k)] for k in self.target.keys()},
+            "goal": {k: [0] for k in self._task[0].keys()},
+        }
 
         print("--reset--")
 
@@ -369,6 +392,10 @@ class FixedWingAircraft_simple(gym.Env):
         :param action: ([float]) the action chosen by the agent
         :return: ([float], float, bool, dict) observation vector, reward, done, extra information about episode on done
         """
+
+        # save action
+        self.history["action"].append(action)
+
         # check if any action is nan
         assert not np.any(np.isnan(action))
 
@@ -387,11 +414,13 @@ class FixedWingAircraft_simple(gym.Env):
         self.steps_count += 1
         #        self._steps_for_current_target += 1
 
+        info = {}
         done = False
 
         # check if max step count / end of simulation reached
         if self.steps_count >= self.steps_max > 0:
             done = True
+            info["termination"] = "steps"
 
         if step_success:
             goal_achieved_on_step = False
@@ -402,6 +431,16 @@ class FixedWingAircraft_simple(gym.Env):
                     self.rec.savestate(
                         self.simulator.state, self.simulator.cur_sim_step - 1
                     )
+            """        
+            for state, status in self._get_goal_status().items():
+                self.history["goal"][state].append(status)
+            """
+
+            for state, status in self._task[self.cur_pos + 1].items():
+                self.target[state] = status
+                self.history["target"][state].append(status)
+                self.history["goal"][state].append(0)  # just for testing purposes
+                # self.history["error"][state].append(self._get_error(status)) # get error?
 
             # calculate reward  TODO: move down to get observation and appending?
             reward = self.get_reward(
@@ -409,18 +448,41 @@ class FixedWingAircraft_simple(gym.Env):
                 success=goal_achieved_on_step,
                 potential=False,
             )
-
         else:
             # end simulation bc step failed (TODO: add reasons for failing)
             # set special reward s.t. action will not be applied again in this state
             done = True
 
             reward = self.steps_count - self.steps_max
+            info["termination"] = step_info["termination"]
 
         obs = self.get_observation()
-        info = {"rew": reward}
+        self.history["observation"].append(obs)
+        self.history["reward"].append(reward)
+
+        if done:
+            # calc some metrics
+            metric = 3
+
+        info["target"] = self.target
 
         return obs, reward, done, info
+
+    def save_history(self, path, states, save_targets=True):
+        """
+        Save environment state history to file.
+        :param path: (string) path to save history to
+        :param states: (string or [string]) names of states to save
+        :param save_targets: (bool) save targets
+        """
+        # used
+        self.simulator.save_history(path, states)
+        if save_targets:
+            res = np.load(path, allow_pickle=True).item()
+            for state in self.target.keys():
+                if state in res:
+                    res[state + "_target"] = self.history["target"][state]
+            np.save(path, res)
 
     def set_skip(self, val):
         self.skip = val
@@ -443,7 +505,7 @@ class FixedWingAircraft_simple(gym.Env):
         :param save_path (str) if given, render is saved to this path.
         :return: (matplotlib Figure) if show is false in plot mode, the render figure is returned
         """
-        if mode == "plt":
+        if mode == "plot":
             # get target values
             targets = {
                 k: {"data": np.array(v)}
@@ -459,9 +521,7 @@ class FixedWingAircraft_simple(gym.Env):
             self.viewer["gs"] = matplotlib.gridspec.GridSpec(subfig_count, 1)
 
             # plot actions
-            labels = [
-                a["name"] for a in self.cfg["action"]["states"]
-            ]  # change to fix names elev_left, elev_right, throttle
+            labels = self.act_vec
             x, y = (
                 list(range(len(self.history["action"]))),
                 np.array(
@@ -661,11 +721,10 @@ if __name__ == "__main__":
         )  # ,learning_rate=0.0006)
 
         _, cb = meta_model._setup_learn(
-            5*500,eval_env=env, callback=TensorboardCallback()
+            5 * 500, eval_env=env, callback=TensorboardCallback()
         )
 
         meta_model.callback = cb
-
 
     else:
         meta = False
@@ -682,13 +741,15 @@ if __name__ == "__main__":
     print("-Start-")
     n_eval = 30
     if meta:
-        model_mean_reward_before, model_std_reward_before = evaluate_meta_policy(meta_model, env, n_eval_episodes=n_eval, epoch=0)
+        model_mean_reward_before, model_std_reward_before = evaluate_meta_policy(
+            meta_model, env, n_eval_episodes=n_eval, epoch=0
+        )
     else:
         pass
-#        model_mean_reward_before, model_std_reward_before = evaluate_policy(model, env, n_eval_episodes=n_eval)
+    #        model_mean_reward_before, model_std_reward_before = evaluate_policy(model, env, n_eval_episodes=n_eval)
 
-  #  reward.append(model_mean_reward_before)
-  #  std.append(model_std_reward_before)
+    #  reward.append(model_mean_reward_before)
+    #  std.append(model_std_reward_before)
 
     my_file = open(file, "w+")
     with open(file, "a") as myfile:
@@ -709,7 +770,9 @@ if __name__ == "__main__":
                 callback=TensorboardCallback(),  # FIX creates new tb file each time called
             )  # , eval_freq=100, n_eval_episodes=5, log_interval = 100)
 
-            model_mean_reward, model_std_reward = evaluate_meta_policy(   meta_model, env, n_eval_episodes=n_eval, epoch=i + 1)
+            model_mean_reward, model_std_reward = evaluate_meta_policy(
+                meta_model, env, n_eval_episodes=n_eval, epoch=i + 1
+            )
 
         else:
             model.learn(
@@ -717,8 +780,9 @@ if __name__ == "__main__":
                 callback=TensorboardCallback(),  # FIX creates new tb file each time called
             )  # , eval_freq=100, n_eval_episodes=5, log_interval = 100)
 
-            model_mean_reward, model_std_reward = evaluate_policy(model, env, n_eval_episodes=n_eval)
-
+            model_mean_reward, model_std_reward = evaluate_policy(
+                model, env, n_eval_episodes=n_eval
+            )
 
         reward.append(model_mean_reward)
         std.append(model_std_reward)
