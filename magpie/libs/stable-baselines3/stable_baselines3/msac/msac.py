@@ -6,13 +6,13 @@ from torch.nn import functional as F
 
 from stable_baselines3.common import logger
 from stable_baselines3.common.noise import ActionNoise
-from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
+from stable_baselines3.common.meta_off_policy_algorithm import MetaOffPolicyAlgorithm
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback
 from stable_baselines3.common.utils import polyak_update
 from stable_baselines3.msac.policies import SACPolicy
 
 
-class mSAC(OffPolicyAlgorithm):
+class mSAC(MetaOffPolicyAlgorithm):
     """
     Soft Actor-Critic (SAC)
     Off-Policy Maximum Entropy Deep Reinforcement Learning with a Stochastic Actor,
@@ -438,7 +438,7 @@ class mSAC(OffPolicyAlgorithm):
         tb_log_name: str = "mSAC",
         eval_log_path: Optional[str] = None,
         reset_num_timesteps: bool = True,
-    ) -> OffPolicyAlgorithm:
+    ) -> MetaOffPolicyAlgorithm:
 
         return super(mSAC, self).learn(
             total_timesteps=total_timesteps,

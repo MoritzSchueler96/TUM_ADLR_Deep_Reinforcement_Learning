@@ -124,7 +124,7 @@ def evaluate_meta_policy(
     num_exp_traj_eval = 1
 
     for i in range(n_eval_episodes):
-        if i == len(n_eval_episodes):
+        if i == (n_eval_episodes-1):
             env.env_method("set_skip", False)
 
         with th.no_grad():
