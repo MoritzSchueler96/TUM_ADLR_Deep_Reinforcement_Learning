@@ -157,7 +157,7 @@ def evaluate_meta_policy(
                 episode_rewards.append(np.sum(rwd) / 3)
                 total_episodes += 1
 
-    env.env_method("render", mode="other", epoch=epoch)
+    #env.env_method("render", mode="other", epoch=epoch)
     env.env_method("set_skip", True)
 
     std_reward = np.std(episode_rewards) if total_episodes > 0 else 0.0

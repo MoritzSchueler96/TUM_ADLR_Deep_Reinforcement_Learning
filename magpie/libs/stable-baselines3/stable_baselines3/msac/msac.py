@@ -413,20 +413,26 @@ class mSAC(MetaOffPolicyAlgorithm):
 
         self._n_updates += 1
 
-        logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
-        logger.record("train/ent_coef", np.mean(self.ent_coefs))
-        logger.record("train/actor_loss", np.mean(self.actor_losses))
-        logger.record("train/critic_loss", np.mean(self.critic_losses))
-        logger.record("train/KL_loss", np.mean(np.asarray(self.kl_losses)))
-        logger.record("train/avg. z", np.mean(np.asarray(self.l_z_means)))
-        logger.record("train/avg. z var", np.mean(np.asarray(self.l_z_vars)))
+        logger.record(key = "train/n_updates", value=self._n_updates, exclude="tensorboard")
+        #logger.record(key = "train/ent_coef", value=self.ent_coefs)
+        logger.record(key = "train/actor_loss", value=actor_loss.item())
+        logger.record(key = "train/critic_loss", value = critic_loss.item())
+        logger.record(key = "train/KL_loss", value= kl_loss.detach().numpy().item())
+        logger.record(key = "train/avg. z", value = np.mean(local_means))
+        logger.record(key = "train/avg. z var", value = np.mean(local_vars))
         if len(self.ent_coef_losses) > 0:
-            logger.record("train/ent_coef_loss", np.mean(self.ent_coef_losses))
-       
+            logger.record("train/ent_coef_loss", self.ent_coef_losses)
+        
+        #self._dump_logs()
+        logger.dump(step=self._n_updates)
+
+
         print('KL_DIV:', kl_div)
         print('KL_LOSS:', kl_loss)
         print('Critic_LOSS:',critic_loss)
         print('Actor_LOSS:',actor_loss)
+
+
     def learn(
         self,
         total_timesteps: int,

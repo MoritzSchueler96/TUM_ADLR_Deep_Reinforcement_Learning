@@ -198,6 +198,7 @@ class FixedWingAircraft_simple(gym.Env):
         task={},
         n_tasks=2,
         sampler=None,
+        task_dir = None,
         sim_config_path=None,
         sim_parameter_path=None,
         config_kw=None,
@@ -209,6 +210,8 @@ class FixedWingAircraft_simple(gym.Env):
         :param sim_config_path: (string) path to json configuration file for PyFly
         :param sim_parameter_path: (string) path to aircraft parameter file used by PyFly
         """
+        # Used if trained with curriculum
+        self.task_dir= task_dir
 
         # choose simulator
         self.simulator = PyFly(
@@ -308,7 +311,11 @@ class FixedWingAircraft_simple(gym.Env):
 
     def sample_tasks(self, num_tasks):
         tasks = []
-        taskDir = os.path.join(startingDir, "tasks")
+        if self.task_dir is not None:
+            # Used in curriculum Learning
+            taskDir = self.task_dir
+        else:
+            taskDir = os.path.join(startingDir, "tasks")
         all_files = os.listdir(taskDir)
         files = random.sample(all_files, num_tasks)
         for f in files:
@@ -442,7 +449,10 @@ class FixedWingAircraft_simple(gym.Env):
 
             if all(goal_status):
                 goal_achieved_on_step = True
-                self.sample_task(self.idx + 1)
+                try:
+                    self.sample_task(self.idx + 1)
+                except:
+                    print('FUCKUP')
                 self.goal_achieved = True
                 done = True
 
@@ -638,19 +648,27 @@ class FixedWingAircraft_simple(gym.Env):
         rew = 0
         for r in enumerate(self.rwd_vec):
             if self.rwd_method[r[0]] == "abs":
-                rew += self.rwd_weights[r[0]] * (
-                    self.simulator.state[r[1]].value
-                    - self.simulator.state[r[1]].history[-2]
-                )
-            else:
-                rew += (
-                    self.rwd_weights[r[0]]
-                    * np.exp(
+                try:
+                    rew += self.rwd_weights[r[0]] * (
                         self.simulator.state[r[1]].value
                         - self.simulator.state[r[1]].history[-2]
                     )
-                    ** 2
-                )
+                except:
+                    print('FUCKUP')
+                    rew += 0
+            else:
+                try:
+                    rew += (
+                        self.rwd_weights[r[0]]
+                        * np.exp(
+                            self.simulator.state[r[1]].value
+                            - self.simulator.state[r[1]].history[-2]
+                        )
+                        ** 2
+                    )
+                except:
+                    print('FUCKUP')
+                    rew += 0
 
         # for idx, meas in enumerate(self.rwd_vec):
         #     if self.targets[idx] != 0:
@@ -659,13 +677,13 @@ class FixedWingAircraft_simple(gym.Env):
         #         val = -0.02* (self.simulator.state[meas].value - self.targets[idx])**2 #Always fly to 100,0,-50
 
         #     reward += val
-        curr_hgt = -1 * self.simulator.state["position_d"].value
-        last_hgt = -1 * self.simulator.state["position_d"].history[-2]
+       # curr_hgt = -1 * self.simulator.state["position_d"].value
+       # last_hgt = -1 * self.simulator.state["position_d"].history[-2]
 
         # negatives delta zum vorherigen zeitschritt
         #
 
-        reward = curr_hgt - last_hgt
+        reward = rew
         # reward -= np.sum(np.asarray(action)**2)
         return reward
 
@@ -685,7 +703,7 @@ class FixedWingAircraft_simple(gym.Env):
 ########################################################################################################################################################
 
 
-def make_env(config_path, n_tasks, rank=0, seed=0, info_kw=None, sim_config_kw=None):
+def make_env(config_path, n_tasks, rank=0, seed=0, taskdir=None, info_kw=None, sim_config_kw=None):
     """
     Utility function for multiprocessed env.
 
@@ -697,7 +715,7 @@ def make_env(config_path, n_tasks, rank=0, seed=0, info_kw=None, sim_config_kw=N
     """
 
     def _init():
-        env = FixedWingAircraft_simple(config_path, n_tasks=n_tasks)
+        env = FixedWingAircraft_simple(config_path, n_tasks=n_tasks, task_dir=taskdir)
         env = Monitor(
             env, filename=None, allow_early_resets=True, info_keywords=info_kw
         )
@@ -722,6 +740,16 @@ def save_model(model, save_folder):
 
 
 if __name__ == "__main__":
+
+    ##############
+    ## Settings ##
+    N_EPOCHS = 10
+    N_TRAINTASKS = 5
+    N_TESTTASKS = 5
+    ##############
+
+
+
     modelname = "Msac__" + datetime.datetime.now().strftime("%H_%M%p__%B_%d_%Y")
     model_folder = os.path.join(modelDir, modelname)
     if not os.path.exists(model_folder):
@@ -738,7 +766,7 @@ if __name__ == "__main__":
                     rank=n,
                     seed=1337,
                     info_kw=info_kw,
-                    n_tasks=130,
+                    n_tasks=(N_TESTTASKS+N_TRAINTASKS),
                 )
                 for n in range(1)
             ]
@@ -753,8 +781,8 @@ if __name__ == "__main__":
         meta_model = mSAC(
             "MlpPolicy",
             env,
-            n_traintasks=100,
-            n_evaltasks=30,
+            n_traintasks=N_TRAINTASKS,
+            n_evaltasks=N_TESTTASKS,
             n_epochtasks=5,
             verbose=1,
             policy_kwargs=dict(
@@ -768,8 +796,6 @@ if __name__ == "__main__":
         )
 
         meta_model.callback = cb
-
-
     else:
         meta = False
         model = PPO(
@@ -782,8 +808,13 @@ if __name__ == "__main__":
     reward = []
     std = []
 
+
+    curriculum = False
+    curric_idx = 0
+    curric_paths=['/easy', '/medium', '/hard']
+
+
     print("-Start-")
-    n_eval = 30
     if meta:
         save_model(meta_model, modelDir + modelname)
         print(env)
@@ -792,7 +823,7 @@ if __name__ == "__main__":
         print(env)
         print('done')
         meta_model.callback = cllbck
-        model_mean_reward_before, model_std_reward_before = evaluate_meta_policy(meta_model, env, n_eval_episodes=n_eval, epoch=0)
+        model_mean_reward_before, model_std_reward_before = evaluate_meta_policy(meta_model, env, n_eval_episodes=N_TESTTASKS, epoch=0)
     else:
         pass
 #        model_mean_reward_before, model_std_reward_before = evaluate_policy(model, env, n_eval_episodes=n_eval)
@@ -812,7 +843,7 @@ if __name__ == "__main__":
     print(
         "##################################Start Learning##################################"
     )
-    for i in range(50):
+    for EPOCH in range(50):
         if meta:
             meta_model.learn(
                 total_timesteps=5 * 500,
@@ -820,7 +851,7 @@ if __name__ == "__main__":
             )  # , eval_freq=100, n_eval_episodes=5, log_interval = 100)
 
             model_mean_reward, model_std_reward = evaluate_meta_policy(
-                meta_model, env, n_eval_episodes=n_eval, epoch=i + 1
+                meta_model, env, n_eval_episodes=N_TESTTASKS, epoch=EPOCH + 1
             )
 
         else:
@@ -830,25 +861,48 @@ if __name__ == "__main__":
             )  # , eval_freq=100, n_eval_episodes=5, log_interval = 100)
 
             model_mean_reward, model_std_reward = evaluate_policy(
-                model, env, n_eval_episodes=n_eval
+                model, env, n_eval_episodes=N_TESTTASKS
             )
 
         reward.append(model_mean_reward)
         std.append(model_std_reward)
 
-        print("epoch:", i)
+        print("epoch:", EPOCH)
         print("meta_reward = ", reward)
         print("meta_std = ", std)
 
         with open(file, "a") as myfile:
-            myfile.write("epoch:" + str(i + 1) + "\n")
+            myfile.write("epoch:" + str(EPOCH + 1) + "\n")
             myfile.write("meta_reward = " + str(reward) + "\n")
             myfile.write("meta_std = " + str(std) + "\n")
             myfile.write(
                 "================================================================================================\n\n"
             )
 
-    save_model(meta_model, modelDir + modelname)
+        if curriculum and EPOCH % 10 == 0 and EPOCH > 1:
+            #every 10 Epochs crank up the difficulty
+            env = VecNormalize(
+            SubprocVecEnv(
+                [
+                    make_env(
+                        config_path=os.path.join(configDir, "pyfly_config.json"),
+                        rank=0,
+                        seed=1337,
+                        info_kw=info_kw,
+                        n_tasks=(N_TESTTASKS+N_TRAINTASKS),
+                        taskdir=curric_paths[curric_idx]
+                    )
+                ]
+            )
+            )
+            curric_idx += 1
+
+            if meta:
+                meta_model.env = env
+            else:
+                model.env = env
+
+        save_model(meta_model, modelDir + modelname)
     # env.close()
 
 
