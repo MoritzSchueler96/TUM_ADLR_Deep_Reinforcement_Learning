@@ -647,6 +647,8 @@ class FixedWingAircraft_simple(gym.Env):
                     ** 2
                 )
 
+        rew = 1 / np.exp(rew)
+
         return rew
 
     def get_observation(self):
