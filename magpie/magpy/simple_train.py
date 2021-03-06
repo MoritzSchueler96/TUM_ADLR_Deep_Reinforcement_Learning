@@ -743,9 +743,9 @@ if __name__ == "__main__":
 
     ##############
     ## Settings ##
-    N_EPOCHS = 10
-    N_TRAINTASKS = 5
-    N_TESTTASKS = 5
+    N_EPOCHS = 30
+    N_TRAINTASKS = 50
+    N_TESTTASKS = 15
     ##############
 
 
@@ -843,7 +843,7 @@ if __name__ == "__main__":
     print(
         "##################################Start Learning##################################"
     )
-    for EPOCH in range(50):
+    for EPOCH in range(N_EPOCHS):
         if meta:
             meta_model.learn(
                 total_timesteps=5 * 500,

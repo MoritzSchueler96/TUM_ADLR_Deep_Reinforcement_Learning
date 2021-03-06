@@ -9,6 +9,9 @@ __pycache__/
 # Renderings
 *.avi
 
+# Models
+magpie/magpy/models/*
+
 # Distribution / packaging
 .Python
 build/
