@@ -32,7 +32,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import mpl_toolkits.mplot3d.axes3d as p3
 import matplotlib.animation as animation
-sys.path.append('../libs/pyfly-fixed-wing-visualizer/')
+
+sys.path.append("../libs/pyfly-fixed-wing-visualizer/")
 from pyfly_fixed_wing_visualizer.pyfly_fixed_wing_visualizer import simrecorder
 
 ########################################################################################################################################################
@@ -159,7 +160,7 @@ class TensorboardCallback(BaseCallback):
                 )
                 last_render = time.time()
 
-            if False:#self.num_timesteps - last_test >= test_interval:
+            if False:  # self.num_timesteps - last_test >= test_interval:
                 last_test = self.num_timesteps
                 evaluate_meta_policy(
                     model,
@@ -198,7 +199,7 @@ class FixedWingAircraft_simple(gym.Env):
         task={},
         n_tasks=2,
         sampler=None,
-        task_dir = None,
+        task_dir=None,
         sim_config_path=None,
         sim_parameter_path=None,
         config_kw=None,
@@ -211,7 +212,7 @@ class FixedWingAircraft_simple(gym.Env):
         :param sim_parameter_path: (string) path to aircraft parameter file used by PyFly
         """
         # Used if trained with curriculum
-        self.task_dir= task_dir
+        self.task_dir = task_dir
 
         # choose simulator
         self.simulator = PyFly(
@@ -449,10 +450,7 @@ class FixedWingAircraft_simple(gym.Env):
 
             if all(goal_status):
                 goal_achieved_on_step = True
-                try:
-                    self.sample_task(self.idx + 1)
-                except:
-                    print('FUCKUP')
+                self.sample_task(self.idx + 1)
                 self.goal_achieved = True
                 done = True
 
@@ -624,68 +622,31 @@ class FixedWingAircraft_simple(gym.Env):
             else:
                 self.rec.plot(render="other", epoch=epoch)
 
-    # TODO: change to work with array
-    def apply_scaling(self):
-        val = self.simulator.state[r[1]].value
-        max = self.rwd_max
-        target = self.target.state[r[1]].value
-
-        if target - val > target - max:
-            self.rwd_max = val
-
-        fac = (target - val) / (target - max)
-
-        return fac
-
     def get_reward(self, action=None, success=False, potential=False):
         """
         Get the reward for the current state of the environment.
         :return: (float) reward
         """
-        reward = 0
 
         # idea on how to calc reward without scaling
         rew = 0
         for r in enumerate(self.rwd_vec):
             if self.rwd_method[r[0]] == "abs":
-                try:
-                    rew += self.rwd_weights[r[0]] * (
-                        self.simulator.state[r[1]].value
-                        - self.simulator.state[r[1]].history[-2]
-                    )
-                except:
-                    print('FUCKUP')
-                    rew += 0
+                rew += self.rwd_weights[r[0]] * (
+                    self.simulator.state[r[1]].value
+                    - self._goal[r[1]]
+                )
             else:
-                try:
-                    rew += (
-                        self.rwd_weights[r[0]]
-                        * np.exp(
-                            self.simulator.state[r[1]].value
-                            - self.simulator.state[r[1]].history[-2]
-                        )
-                        ** 2
+                rew += (
+                    self.rwd_weights[r[0]]
+                    * np.exp(
+                        self.simulator.state[r[1]].value
+                        - self.goal[r[1]]
                     )
-                except:
-                    print('FUCKUP')
-                    rew += 0
+                    ** 2
+                )
 
-        # for idx, meas in enumerate(self.rwd_vec):
-        #     if self.targets[idx] != 0:
-        #         val = -0.02* ((self.simulator.state[meas].value - self.targets[idx])/(self.targets[idx]))**2 #Always fly to 100,0,-50
-        #     else:
-        #         val = -0.02* (self.simulator.state[meas].value - self.targets[idx])**2 #Always fly to 100,0,-50
-
-        #     reward += val
-       # curr_hgt = -1 * self.simulator.state["position_d"].value
-       # last_hgt = -1 * self.simulator.state["position_d"].history[-2]
-
-        # negatives delta zum vorherigen zeitschritt
-        #
-
-        reward = rew
-        # reward -= np.sum(np.asarray(action)**2)
-        return reward
+        return rew
 
     def get_observation(self):
         """
@@ -703,7 +664,9 @@ class FixedWingAircraft_simple(gym.Env):
 ########################################################################################################################################################
 
 
-def make_env(config_path, n_tasks, rank=0, seed=0, taskdir=None, info_kw=None, sim_config_kw=None):
+def make_env(
+    config_path, n_tasks, rank=0, seed=0, taskdir=None, info_kw=None, sim_config_kw=None
+):
     """
     Utility function for multiprocessed env.
 
@@ -735,7 +698,15 @@ def save_model(model, save_folder):
     """
     model.env.save(os.path.join(save_folder, "env.pkl"))
     model.save(
-        os.path.join(save_folder, "model.pkl"), include = ['actor', 'critic'], exclude=['JUST_EVAL', 'RBList_encoder', 'RBList_replay', 'RBList_eval', 'callback']
+        os.path.join(save_folder, "model.pkl"),
+        include=["actor", "critic"],
+        exclude=[
+            "JUST_EVAL",
+            "RBList_encoder",
+            "RBList_replay",
+            "RBList_eval",
+            "callback",
+        ],
     )  # FIX failes somehow only for mSAC
 
 
@@ -747,8 +718,6 @@ if __name__ == "__main__":
     N_TRAINTASKS = 50
     N_TESTTASKS = 15
     ##############
-
-
 
     modelname = "Msac__" + datetime.datetime.now().strftime("%H_%M%p__%B_%d_%Y")
     model_folder = os.path.join(modelDir, modelname)
@@ -766,7 +735,7 @@ if __name__ == "__main__":
                     rank=n,
                     seed=1337,
                     info_kw=info_kw,
-                    n_tasks=(N_TESTTASKS+N_TRAINTASKS),
+                    n_tasks=(N_TESTTASKS + N_TRAINTASKS),
                 )
                 for n in range(1)
             ]
@@ -774,7 +743,6 @@ if __name__ == "__main__":
     )
 
     cllbck = TensorboardCallback()
-
 
     if True:
         meta = True
@@ -791,9 +759,7 @@ if __name__ == "__main__":
             tensorboard_log=os.path.join(model_folder, "tb"),
         )  # ,learning_rate=0.0006)
 
-        _, cb = meta_model._setup_learn(
-            5*500,eval_env=env, callback=cllbck
-        )
+        _, cb = meta_model._setup_learn(5 * 500, eval_env=env, callback=cllbck)
 
         meta_model.callback = cb
     else:
@@ -808,11 +774,9 @@ if __name__ == "__main__":
     reward = []
     std = []
 
-
     curriculum = False
     curric_idx = 0
-    curric_paths=['/easy', '/medium', '/hard']
-
+    curric_paths = ["/easy", "/medium", "/hard"]
 
     print("-Start-")
     if meta:
@@ -821,15 +785,17 @@ if __name__ == "__main__":
         meta_model = mSAC.load(os.path.join(modelDir + modelname, "model.pkl"))
         meta_model.env = env
         print(env)
-        print('done')
+        print("done")
         meta_model.callback = cllbck
-        model_mean_reward_before, model_std_reward_before = evaluate_meta_policy(meta_model, env, n_eval_episodes=N_TESTTASKS, epoch=0)
+        model_mean_reward_before, model_std_reward_before = evaluate_meta_policy(
+            meta_model, env, n_eval_episodes=N_TESTTASKS, epoch=0
+        )
     else:
         pass
-#        model_mean_reward_before, model_std_reward_before = evaluate_policy(model, env, n_eval_episodes=n_eval)
+    #        model_mean_reward_before, model_std_reward_before = evaluate_policy(model, env, n_eval_episodes=n_eval)
 
-  #  reward.append(model_mean_reward_before)
-  #  std.append(model_std_reward_before)
+    #  reward.append(model_mean_reward_before)
+    #  std.append(model_std_reward_before)
 
     my_file = open(file, "w+")
     with open(file, "a") as myfile:
@@ -880,20 +846,20 @@ if __name__ == "__main__":
             )
 
         if curriculum and EPOCH % 10 == 0 and EPOCH > 1:
-            #every 10 Epochs crank up the difficulty
+            # every 10 Epochs crank up the difficulty
             env = VecNormalize(
-            SubprocVecEnv(
-                [
-                    make_env(
-                        config_path=os.path.join(configDir, "pyfly_config.json"),
-                        rank=0,
-                        seed=1337,
-                        info_kw=info_kw,
-                        n_tasks=(N_TESTTASKS+N_TRAINTASKS),
-                        taskdir=curric_paths[curric_idx]
-                    )
-                ]
-            )
+                SubprocVecEnv(
+                    [
+                        make_env(
+                            config_path=os.path.join(configDir, "pyfly_config.json"),
+                            rank=0,
+                            seed=1337,
+                            info_kw=info_kw,
+                            n_tasks=(N_TESTTASKS + N_TRAINTASKS),
+                            taskdir=os.path.join(startingDir, "paths", curric_paths[curric_idx],
+                        )
+                    ]
+                )
             )
             curric_idx += 1
 
