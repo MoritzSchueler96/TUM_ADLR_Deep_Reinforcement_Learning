@@ -64,6 +64,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 # global variables
 render_interval = 500  # Time in seconds between rendering of training episodes
+tb_image_send_interval = 1000
 test_interval = 500000
 last_test = 0
 last_render = time.time()
@@ -96,7 +97,7 @@ class TensorboardCallback(BaseCallback):
         super(TensorboardCallback, self).__init__(verbose)
 
     def _on_step(self) -> bool:
-        global last_ep_info, info_kw, log_interval, render_interval, last_render, render_check, model_folder, test_interval, last_test, checkpoint_save_interval, last_save, env, model
+        global last_ep_info, info_kw, log_interval, render_interval, last_render, render_check, model_folder, test_interval, last_test, checkpoint_save_interval, last_save, env, model, tb_image_send_interval
 
         if "ep_info_buffer" in self.locals:
             ep_info_buf = self.locals["ep_info_buffer"]
@@ -168,7 +169,7 @@ class TensorboardCallback(BaseCallback):
                     # writer=self.logger,
                 )
 
-            if now - render_check["time"] >= 300000:
+            if now - render_check["time"] >= tb_image_send_interval:
                 for render_file in os.listdir(os.path.join(model_folder, "render")):
                     if render_file not in render_check["files"]:
                         render_check["files"].append(render_file)
