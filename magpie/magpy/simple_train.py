@@ -311,13 +311,31 @@ class FixedWingAircraft_simple(gym.Env):
             "goal": {k: [0] for k in self._task[0].keys()},
         }
 
+    def get_goal_vector(self, goal_position):
+        # extract velocities and calculate Va
+        Va = []
+        for vel in ["velocity_u", "velocity_v", "velocity_w"]:
+            Va.append(goal_position[vel])
+            del goal_position[vel]
+
+        Va = np.linalg.norm(Va)
+        goal_position["Va"] = Va
+
+        wanted_vars = set(goal_position.keys()) - set(
+            ["yaw", "wind_n", "wind_e", "wind_d"]
+        )
+        unwanted_vars = set(goal_position.keys()) - wanted_vars
+        for unwanted_key in unwanted_vars:
+            del goal_position[unwanted_key]
+        return goal_position
+
     def sample_tasks(self, num_tasks):
         tasks = []
         if self.task_dir is not None:
             # Used in curriculum Learning
             taskDir = self.task_dir
         else:
-            taskDir = os.path.join(startingDir, "tasks")
+            taskDir = os.path.join(startingDir, "tasks", "easy")
         all_files = os.listdir(taskDir)
         files = random.sample(all_files, num_tasks)
         for f in files:
@@ -338,10 +356,15 @@ class FixedWingAircraft_simple(gym.Env):
         return self.tasks[id]
 
     def sample_target(self, id, pos):
-        start = self.tasks[id][pos]
-        goal = self.tasks[id][pos + 1]
-        self.simulator.reset(state=start)
-        self._goal = goal
+        start = self.tasks[id][pos].copy()
+        if "wind_noise" in start:
+            wind_noise = start["wind_noise"]
+            del start["wind_noise"]
+        else:
+            wind_noise = None
+        self.simulator.reset(state=start, turbulence_noise=wind_noise)
+        goal = self.tasks[id][pos + 1].copy()
+        self._goal = self.get_goal_vector(goal)
         self.rec = simrecorder(self.steps_max)
         return self.tasks[id], goal
 
@@ -634,17 +657,12 @@ class FixedWingAircraft_simple(gym.Env):
         for r in enumerate(self.rwd_vec):
             if self.rwd_method[r[0]] == "abs":
                 rew += self.rwd_weights[r[0]] * (
-                    self.simulator.state[r[1]].value
-                    - self._goal[r[1]]
+                    self.simulator.state[r[1]].value - self._goal[r[1]]
                 )
             else:
                 rew += (
                     self.rwd_weights[r[0]]
-                    * np.exp(
-                        self.simulator.state[r[1]].value
-                        - self.goal[r[1]]
-                    )
-                    ** 2
+                    * np.exp(self.simulator.state[r[1]].value - self.goal[r[1]]) ** 2
                 )
 
         rew = 1 / np.exp(rew)
@@ -779,7 +797,7 @@ if __name__ == "__main__":
 
     curriculum = False
     curric_idx = 0
-    curric_paths = ["/easy", "/medium", "/hard"]
+    curric_paths = ["easy", "medium", "hard", "extreme", "ludicrous"]
 
     print("-Start-")
     if meta:
@@ -859,8 +877,11 @@ if __name__ == "__main__":
                             seed=1337,
                             info_kw=info_kw,
                             n_tasks=(N_TESTTASKS + N_TRAINTASKS),
-                            taskdir=os.path.join(startingDir, "paths", curric_paths[curric_idx],
+                            taskdir=os.path.join(
+                                startingDir, "tasks", curric_paths[curric_idx]
+                            ),
                         )
+                        for n in range(1)
                     ]
                 )
             )
