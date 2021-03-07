@@ -234,10 +234,10 @@ class FixedWingAircraft_simple(gym.Env):
         # init observation vector
 
         # iterate over observation states
-
+        # NOTE: What about pitch, roll rewards??
         self.rwd_vec = ["position_n", "position_e", "position_d", "Va"]
         self.rwd_weights = [1, 1, 1, 1]
-        self.rwd_method = ["euclid", "euclid", "euclid", "abs"]
+        self.rew_range = {"position_n": 6, "position_e": 6, "position_d": 6, "Va": 25}
         self.target = {}
 
         self.rwd_delta = [5]
@@ -526,7 +526,6 @@ class FixedWingAircraft_simple(gym.Env):
             return self._get_angle_dist(
                 self._goal[state], self.simulator.state[state].value
             )
-
         else:
             return self._goal[state] - self.simulator.state[state].value
 
@@ -646,6 +645,9 @@ class FixedWingAircraft_simple(gym.Env):
             else:
                 self.rec.plot(render="other", epoch=epoch)
 
+    def scale_reward(self, name, dist):
+        return dist / self.rew_range[name]
+
     def get_reward(self, action=None, success=False, potential=False):
         """
         Get the reward for the current state of the environment.
@@ -654,16 +656,10 @@ class FixedWingAircraft_simple(gym.Env):
 
         # idea on how to calc reward without scaling
         rew = 0
-        for r in enumerate(self.rwd_vec):
-            if self.rwd_method[r[0]] == "abs":
-                rew += self.rwd_weights[r[0]] * (
-                    self.simulator.state[r[1]].value - self._goal[r[1]]
-                )
-            else:
-                rew += (
-                    self.rwd_weights[r[0]]
-                    * np.exp(self.simulator.state[r[1]].value - self.goal[r[1]]) ** 2
-                )
+        for num, name in enumerate(self.rwd_vec):
+            dist = self._get_error(name)
+            dist = self.scale_reward(name, dist)
+            rew += self.rwd_weights[num] * dist
 
         rew = 1 / np.exp(rew)
 
