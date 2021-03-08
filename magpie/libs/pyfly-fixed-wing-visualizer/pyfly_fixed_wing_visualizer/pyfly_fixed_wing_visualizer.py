@@ -77,7 +77,7 @@ class simrecorder:
         """
         self.res_n[idd] = state["position_n"].value
         self.res_e[idd] = state["position_e"].value
-        self.res_d[idd] = -state["position_d"].value
+        self.res_d[idd] = state["position_d"].value
         self.wind_n[idd] = state["wind_n"].value
         self.wind_e[idd] = state["wind_e"].value
         self.wind_d[idd] = state["wind_d"].value
@@ -134,6 +134,13 @@ class simrecorder:
             ]
         )
 
+    def set_traj(self, trajectory):
+        #[{'Va': 13.5, 'pitch': 0.0, 'position_d': 107.4, 'position_e': 6.2, 'position_n': 8.3, 'roll': 7.4}]
+        self.t_p_d = -trajectory['position_d'][0]
+        self.t_p_e = trajectory['position_e'][0]
+        self.t_p_n = trajectory['position_n'][0]
+
+
     def plot(self, rotate=180, interval=10, render="notebook", epoch=None):
         """
         Main plotting functions accepting the following optional parameters:
@@ -188,8 +195,9 @@ class simrecorder:
         (lines[0],) = self.ax.plot(data[0][0:1], data[1][0:1], data[2][0:1], c="orange")
 
         self.trajectory = self.ax.plot(
-            data[0][0:1], data[1][0:1], data[2][0:1], c="green"
-        )
+                [data[0][0], data[0][0]],
+                [data[1][0], data[1][0]],
+            )
 
         # Creating the Animation object
         self.pb = self.prog(500, "Drawing", " Frame", 0)
@@ -304,11 +312,11 @@ class simrecorder:
             print(self.trajectory)
 
             self.trajectory[0].set_data(
-                [dataLines[0][0], dataLines[0][0] + 100],
-                [dataLines[1][0], dataLines[1][0]],
+                [dataLines[0][0], self.t_p_n],
+                [dataLines[1][0], self.t_p_e,],
             )
 
-            self.trajectory[0].set_3d_properties([dataLines[2][0], dataLines[2][0]])
+            self.trajectory[0].set_3d_properties([dataLines[2][0], self.t_p_d])
 
             drone = np.dot(self.eulerAnglesToRotationMatrix([0, 0, 0]), self.drone)
             self.ax.plot_trisurf(
