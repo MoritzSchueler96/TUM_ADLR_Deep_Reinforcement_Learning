@@ -308,7 +308,7 @@ class FixedWingAircraft_simple(gym.Env):
             "observation": [],
             "target": {k: [v] for k, v in self._task[0].items()},
             "error": [],  # {k: [self._get_error(k)] for k in self.target.keys()},
-            "goal": {k: [0] for k in self._task[0].keys()},
+            "goal": {k: [0] for k in self.rwd_vec},
         }
 
     def get_goal_vector(self, goal_position):
@@ -321,10 +321,7 @@ class FixedWingAircraft_simple(gym.Env):
         Va = np.linalg.norm(Va)
         goal_position["Va"] = Va
 
-        wanted_vars = set(goal_position.keys()) - set(
-            ["yaw", "wind_n", "wind_e", "wind_d"]
-        )
-        unwanted_vars = set(goal_position.keys()) - wanted_vars
+        unwanted_vars = set(goal_position.keys()) - set(self.rwd_vec)
         for unwanted_key in unwanted_vars:
             del goal_position[unwanted_key]
         return goal_position
@@ -357,12 +354,7 @@ class FixedWingAircraft_simple(gym.Env):
 
     def sample_target(self, id, pos):
         start = self.tasks[id][pos].copy()
-        if "wind_noise" in start:
-            wind_noise = start["wind_noise"]
-            del start["wind_noise"]
-        else:
-            wind_noise = None
-        self.simulator.reset(state=start, turbulence_noise=wind_noise)
+        self.simulator.reset(state=start)
         goal = self.tasks[id][pos + 1].copy()
         self._goal = self.get_goal_vector(goal)
         self.rec = simrecorder(self.steps_max)
@@ -409,7 +401,7 @@ class FixedWingAircraft_simple(gym.Env):
             "observation": [obs],
             "target": {k: [v] for k, v in self._task[0].items()},
             "error": [],  # {k: [self._get_error(k)] for k in self.target.keys()},
-            "goal": {k: [0] for k in self._task[0].keys()},
+            "goal": {k: [0] for k in self.rwd_vec},
         }
 
         print("--reset--")
