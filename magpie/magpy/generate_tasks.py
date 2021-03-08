@@ -9,11 +9,11 @@ import mpl_toolkits.mplot3d.axes3d as p3
 import pylab
 
 
-def sample(var_name, precision):
+def sample(var_name, precision, length=1):
     value = np.random.randint(
-        start[var_name]["min"] * precision, start[var_name]["max"] * precision, 1
-    )[0] / float(precision)
-    return value
+        start[var_name]["min"] * precision, start[var_name]["max"] * precision, length
+    ) / float(precision)
+    return value[0] if length == 1 else value
 
 
 def calc_coord(dist, alpha, unit_dir, previous_coord, precision):
@@ -90,21 +90,18 @@ def calc_angle(v):
     return angle
 
 
-def calc_wind(wind, wind_noise, use_wind, fix_wind):
+def calc_wind(wind, use_wind, fix_wind):
     if not use_wind:
-        return 0, 0
+        return [0, 0, 0]
     else:
         if fix_wind:
             wind_scale = 1
-            wind_noise_scale = 1
         else:
             wind_scale = np.random.randint(90, 110, 1)[0] / float(100)
-            wind_noise_scale = np.random.randint(90, 110, 1)[0] / float(100)
 
     wind *= wind_scale
-    wind_noise *= wind_noise_scale
 
-    return wind, wind_noise
+    return wind
 
 
 def asDict(point, var):
@@ -118,8 +115,9 @@ def asDict(point, var):
         "velocity_u",
         "velocity_v",
         "velocity_w",
-        "wind",
-        "wind_noise",
+        "wind_n",
+        "wind_e",
+        "wind_d",
     ]
     d = {}
     for i in range(len(names)):
@@ -201,6 +199,9 @@ var = [
     "velocity_u",
     "velocity_v",
     "velocity_w",
+    "wind_n",
+    "wind_e",
+    "wind_d",
 ]  # variables to keep
 
 # set starting direction
@@ -222,10 +223,9 @@ save = True
 start = {
     "position_n": {"min": -10, "max": 10},
     "position_e": {"min": -10, "max": 10},
-    "position_d": {"min": 50, "max": 200},
+    "position_d": {"min": -200, "max": -50},
     "velocity": {"min": 5, "max": 20},
-    "wind": {"min": 0, "max": 10},
-    "wind_noise": {"min": 1, "max": 5},
+    "wind": {"min": -6, "max": 6},
 }
 
 for n in range(num_tasks):
@@ -238,8 +238,7 @@ for n in range(num_tasks):
 
     # get random wind for whole trajectorie
     vel_range = sample("velocity", precision)
-    wind = sample("wind", precision)
-    wind_noise = sample("wind_noise", precision)
+    wind = sample("wind", precision, 3)
 
     for p in range(pos):
 
@@ -295,11 +294,9 @@ for n in range(num_tasks):
         angles.append(angle)
 
         # set wind
-        wind, wind_noise = calc_wind(wind, wind_noise, use_wind, fix_wind)
+        wind = calc_wind(wind, use_wind, fix_wind)
 
-        point = np.concatenate([coord, angle, vel], axis=0)
-        point = np.append(point, wind)
-        point = np.append(point, wind_noise)
+        point = np.concatenate([coord, angle, vel, wind], axis=0)
         points.append(point)
 
         # put point into a dictionary

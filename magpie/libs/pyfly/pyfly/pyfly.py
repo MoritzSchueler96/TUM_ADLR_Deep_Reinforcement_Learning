@@ -1342,9 +1342,6 @@ class PyFly:
                 else:
                     p.plot(fig=sub_fig)
 
-            if self.rec:
-                self.rec.plot()
-
             if viewer is None:
                 plt.show(block=block)
             if close:
