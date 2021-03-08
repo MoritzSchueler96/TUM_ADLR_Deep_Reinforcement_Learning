@@ -338,11 +338,12 @@ class FixedWingAircraft_simple(gym.Env):
         for f in files:
             task = np.load(os.path.join(taskDir, f), allow_pickle=True)
             tasks.append(task)
-
+        for file in files:
+            print(file)
         return tasks
 
     def sample_task(self, id):
-        if id == self.idx and self.cur_pos < len(self.tasks[id]):
+        if id == self.idx and self.cur_pos < len(self.tasks[id])-1:
             self.cur_pos += 1
         elif id == self.idx:
             self.cur_pos = 0
@@ -353,6 +354,7 @@ class FixedWingAircraft_simple(gym.Env):
         return self.tasks[id]
 
     def sample_target(self, id, pos):
+        print(id, pos)
         start = self.tasks[id][pos].copy()
         self.simulator.reset(state=start)
         goal = self.tasks[id][pos + 1].copy()
@@ -363,6 +365,8 @@ class FixedWingAircraft_simple(gym.Env):
         return range(len(self.tasks))
 
     def reset_task(self, idx):
+        print('PEARL WANTs:', idx)
+        self.idx = idx
         self._task, _ = self.sample_target(idx, 0)
 
     def seed(self, seed=None):
@@ -385,23 +389,16 @@ class FixedWingAircraft_simple(gym.Env):
         self.steps_count = 0
 
         self.simulator = PyFly(
-            os.path.join(configDir, "pyfly_config.json"),
-            os.path.join(configDir, "x8_param.mat"),
-        )
+                    os.path.join(configDir, "pyfly_config.json"),
+                    os.path.join(configDir, "x8_param.mat"),
+                )
 
         self.reset_task(self.idx)  # or 0?
         # self.simulator.turbulence = True
         # self.simulator.turbulence_intensity = "light"
 
+        
         obs = self.get_observation()
-        self.history = {
-            "action": [],
-            "reward": [],
-            "observation": [obs],
-            "target": {k: [v] for k, v in self._task[0].items()},
-            "error": [],  # {k: [self._get_error(k)] for k in self.target.keys()},
-            "goal": {k: [0] for k in self.rwd_vec},
-        }
 
         print("--reset--")
 
@@ -424,6 +421,18 @@ class FixedWingAircraft_simple(gym.Env):
 
         if not self.skip:
             if self.simulator.cur_sim_step == 0:
+
+                obs = self.get_observation()
+                self.history = {
+                    "action": [],
+                    "reward": [],
+                    "observation": [obs],
+                    "target": {k: [v] for k, v in self._task[0].items()},
+                    "error": [],  # {k: [self._get_error(k)] for k in self.target.keys()},
+                    "goal": {k: [0] for k in self.rwd_vec},
+                }
+
+
                 self.rec = simrecorder(self.steps_max)
                 self.rec.set_traj(self.history['target'])
 
@@ -466,9 +475,9 @@ class FixedWingAircraft_simple(gym.Env):
 
             if all(goal_status):
                 goal_achieved_on_step = True
-                self.sample_task(self.idx + 1)
+                self.sample_task(self.idx)# + 1)
                 self.goal_achieved = True
-                done = True
+                #done = True #otherwise new sim is started
 
             # calculate reward  TODO: move down to get observation and appending?
             reward = self.get_reward(
@@ -607,7 +616,7 @@ class FixedWingAircraft_simple(gym.Env):
             ax.plot(x, y)
 
             # plot targets
-            self.simulator.render(close=close, targets=targets, viewer=self.viewer)
+ #           self.simulator.render(close=close, targets=targets, viewer=self.viewer)
 
             # save figures if specified
             if save_path is not None:
@@ -649,7 +658,7 @@ class FixedWingAircraft_simple(gym.Env):
         # idea on how to calc reward without scaling
         rew = 0
         for num, name in enumerate(self.rwd_vec):
-            dist = self._get_error(name)
+            dist = np.abs(self._get_error(name))
             dist = self.scale_reward(name, dist)
             rew += self.rwd_weights[num] * dist
 
