@@ -58,6 +58,7 @@ modelDir = "models/"
 ########################################################################################################################################################
 
 import time
+from stable_baselines3.common import logger # to log curriculum level
 from stable_baselines3.common.logger import Image
 from stable_baselines3.common.callbacks import BaseCallback
 
@@ -367,7 +368,10 @@ class FixedWingAircraft_simple(gym.Env):
     def reset_task(self, idx):
         print('PEARL WANTs:', idx)
         self.idx = idx
+        self.cur_pos = 0
         self._task, _ = self.sample_target(idx, 0)
+
+        print(len(self._task))
 
     def seed(self, seed=None):
         """
@@ -396,7 +400,6 @@ class FixedWingAircraft_simple(gym.Env):
         self.reset_task(self.idx)  # or 0?
         # self.simulator.turbulence = True
         # self.simulator.turbulence_intensity = "light"
-
         
         obs = self.get_observation()
 
@@ -579,7 +582,7 @@ class FixedWingAircraft_simple(gym.Env):
         :param save_path (str) if given, render is saved to this path.
         :return: (matplotlib Figure) if show is false in plot mode, the render figure is returned
         """
-        if mode == "plot":
+        if mode == "plot" and False:
             # get target values
             targets = {
                 k: {"data": np.array(v)}
@@ -830,7 +833,11 @@ if __name__ == "__main__":
     print(
         "##################################Start Learning##################################"
     )
+
     for EPOCH in range(N_EPOCHS):
+
+        logger.record(key = "train/curriculum_level", value = curric_idx)
+
         if meta:
             meta_model.learn(
                 total_timesteps=5 * 500,
