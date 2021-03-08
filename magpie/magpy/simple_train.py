@@ -726,6 +726,11 @@ if __name__ == "__main__":
     N_EPOCHS = 30
     N_TRAINTASKS = 1
     N_TESTTASKS = 1
+
+    curriculum = True
+    curric_idx = 0
+    curric_paths = ["easy", "medium"]#, "hard", "extreme", "ludicrous"]
+    CURR_INC = 1
     ##############
 
     modelname = "Msac__" + datetime.datetime.now().strftime("%H_%M%p__%B_%d_%Y")
@@ -783,9 +788,7 @@ if __name__ == "__main__":
     reward = []
     std = []
 
-    curriculum = False
-    curric_idx = 0
-    curric_paths = ["easy", "medium", "hard", "extreme", "ludicrous"]
+    
 
     print("-Start-")
     if meta:
@@ -854,8 +857,12 @@ if __name__ == "__main__":
                 "================================================================================================\n\n"
             )
 
-        if curriculum and EPOCH % 10 == 0 and EPOCH > 1:
-            # every 10 Epochs crank up the difficulty
+        if curriculum: #and EPOCH % CURR_INC == 0: #and EPOCH > 1:
+            curric_idx += 1
+
+            meta_model.initial_experience = False
+            meta_model.reset_buffers()
+
             env = VecNormalize(
                 SubprocVecEnv(
                     [
@@ -873,7 +880,7 @@ if __name__ == "__main__":
                     ]
                 )
             )
-            curric_idx += 1
+            
 
             if meta:
                 meta_model.env = env
