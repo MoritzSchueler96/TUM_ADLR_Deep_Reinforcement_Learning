@@ -235,9 +235,9 @@ class FixedWingAircraft_simple(gym.Env):
 
         # iterate over observation states
         # NOTE: What about pitch, roll rewards??
-        self.rwd_vec = ["position_n", "position_e", "position_d", "Va"]
+        self.rwd_vec = ["position_n", "position_e", "position_d"]
         self.rwd_weights = [1, 1, 1, 1]
-        self.rew_range = {"position_n": 6, "position_e": 6, "position_d": 6, "Va": 25}
+        self.rew_range = {"position_n": 6, "position_e": 6, "position_d": 6}
         self.target = {}
 
         self.rwd_delta = [5]
@@ -319,7 +319,7 @@ class FixedWingAircraft_simple(gym.Env):
             del goal_position[vel]
 
         Va = np.linalg.norm(Va)
-        goal_position["Va"] = Va
+        #goal_position["Va"] = Va
 
         wanted_vars = set(goal_position.keys()) - set(
             ["yaw", "wind_n", "wind_e", "wind_d"]
@@ -365,7 +365,6 @@ class FixedWingAircraft_simple(gym.Env):
         self.simulator.reset(state=start, turbulence_noise=wind_noise)
         goal = self.tasks[id][pos + 1].copy()
         self._goal = self.get_goal_vector(goal)
-        self.rec = simrecorder(self.steps_max)
         return self.tasks[id], goal
 
     def get_all_task_idx(self):
@@ -732,7 +731,7 @@ if __name__ == "__main__":
 
     ##############
     ## Settings ##
-    N_EPOCHS = 1
+    N_EPOCHS = 30
     N_TRAINTASKS = 1
     N_TESTTASKS = 1
     ##############

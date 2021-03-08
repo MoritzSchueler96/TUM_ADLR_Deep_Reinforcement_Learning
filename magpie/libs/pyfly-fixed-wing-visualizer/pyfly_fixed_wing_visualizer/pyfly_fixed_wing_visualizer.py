@@ -136,7 +136,7 @@ class simrecorder:
 
     def set_traj(self, trajectory):
         #[{'Va': 13.5, 'pitch': 0.0, 'position_d': 107.4, 'position_e': 6.2, 'position_n': 8.3, 'roll': 7.4}]
-        self.t_p_d = -trajectory['position_d'][0]
+        self.t_p_d = trajectory['position_d'][0]
         self.t_p_e = trajectory['position_e'][0]
         self.t_p_n = trajectory['position_n'][0]
 
@@ -318,16 +318,16 @@ class simrecorder:
 
             self.trajectory[0].set_3d_properties([dataLines[2][0], self.t_p_d])
 
-            drone = np.dot(self.eulerAnglesToRotationMatrix([0, 0, 0]), self.drone)
-            self.ax.plot_trisurf(
-                drone[0] + dataLines[0][0] + 100,
-                drone[2] + dataLines[1][num],
-                self.triangles,
-                drone[1] + dataLines[2][-1],
-                shade=True,
-                alpha=0.5,
-                color="green",
-            )
+#            drone = np.dot(self.eulerAnglesToRotationMatrix([0, 0, 0]), self.drone)
+#            self.ax.plot_trisurf(
+#                drone[0] + dataLines[0][0] + 100,
+#                drone[2] + dataLines[1][num],
+#                self.triangles,
+#                drone[1] + dataLines[2][-1],
+#                shade=True,
+#                alpha=0.5,
+#                color="green",
+#            )
 
         for line in lines:
 

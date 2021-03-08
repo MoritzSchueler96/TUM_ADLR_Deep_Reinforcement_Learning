@@ -109,7 +109,7 @@ def calc_wind(wind, wind_noise, use_wind, fix_wind):
 
 def asDict(point, var):
     names = [
-        "posistion_n",
+        "position_n",
         "position_e",
         "position_d",
         "roll",
@@ -192,7 +192,7 @@ np.random.seed(10)
 num_tasks = 200  # number of tasks to generate
 
 var = [
-    "posistion_n",
+    "position_n",
     "position_e",
     "position_d",
     "roll",
