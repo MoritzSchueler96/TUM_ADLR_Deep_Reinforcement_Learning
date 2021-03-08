@@ -434,6 +434,7 @@ class FixedWingAircraft_simple(gym.Env):
         if not self.skip:
             if self.simulator.cur_sim_step == 0:
                 self.rec = simrecorder(self.steps_max)
+                self.rec.set_traj(self.history['target'])
 
         control_input = list(action)
 
@@ -731,9 +732,9 @@ if __name__ == "__main__":
 
     ##############
     ## Settings ##
-    N_EPOCHS = 30
-    N_TRAINTASKS = 50
-    N_TESTTASKS = 15
+    N_EPOCHS = 1
+    N_TRAINTASKS = 1
+    N_TESTTASKS = 1
     ##############
 
     modelname = "Msac__" + datetime.datetime.now().strftime("%H_%M%p__%B_%d_%Y")
