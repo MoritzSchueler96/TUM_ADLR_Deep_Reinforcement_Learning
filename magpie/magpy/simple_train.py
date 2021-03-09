@@ -344,7 +344,7 @@ class FixedWingAircraft_simple(gym.Env):
         return tasks
 
     def sample_task(self, id):
-        if id == self.idx and self.cur_pos < len(self.tasks[id])-1:
+        if id == self.idx and self.cur_pos < len(self.tasks[id])-2:
             self.cur_pos += 1
         elif id == self.idx:
             self.cur_pos = 0
@@ -423,7 +423,7 @@ class FixedWingAircraft_simple(gym.Env):
         # action[2] = abs(action[2])
 
         if not self.skip:
-            if self.simulator.cur_sim_step == 0:
+            if self.steps_count == 0: #self.simulator.cur_sim_step == 0:
 
                 obs = self.get_observation()
                 self.history = {
@@ -437,7 +437,6 @@ class FixedWingAircraft_simple(gym.Env):
 
 
                 self.rec = simrecorder(self.steps_max)
-                self.rec.set_traj(self.history['target'])
 
         control_input = list(action)
 
@@ -460,21 +459,25 @@ class FixedWingAircraft_simple(gym.Env):
             goal_achieved_on_step = False
             goal_status = []
 
-            # save current state for visualization with pyfly fixed wing visualizer
-            if not self.skip:
-                if self.rec:  # and self.steps_count % 50 == 0:
-                    self.rec.savestate(
-                        self.simulator.state, self.simulator.cur_sim_step - 1
-                    )
-
+            
             for state, status in self._get_goal_status().items():
-                self.history["goal"][state].append(status)
-                goal_status.append(status)
+                            self.history["goal"][state].append(status)
+                            goal_status.append(status)
 
             for state, status in self._task[self.cur_pos + 1].items():
                 self.target[state] = status
                 self.history["target"][state].append(status)
                 # self.history["error"][state].append(self._get_error(status)) # get error?
+
+
+            # save current state for visualization with pyfly fixed wing visualizer
+            if not self.skip:
+                if self.rec:  # and self.steps_count % 50 == 0:
+                    self.rec.savestate(
+                        self.simulator.state, self.steps_count - 1, self.target
+                    )
+
+            
 
             if all(goal_status):
                 goal_achieved_on_step = True
@@ -736,13 +739,13 @@ if __name__ == "__main__":
     ##############
     ## Settings ##
     N_EPOCHS = 30
-    N_TRAINTASKS = 1
-    N_TESTTASKS = 1
+    N_TRAINTASKS = 50
+    N_TESTTASKS = 15
 
     curriculum = True
     curric_idx = 0
     curric_paths = ["easy", "medium"]#, "hard", "extreme", "ludicrous"]
-    CURR_INC = 1
+    CURR_INC = 15
     ##############
 
     modelname = "Msac__" + datetime.datetime.now().strftime("%H_%M%p__%B_%d_%Y")
@@ -818,8 +821,8 @@ if __name__ == "__main__":
         pass
     #        model_mean_reward_before, model_std_reward_before = evaluate_policy(model, env, n_eval_episodes=n_eval)
 
-    #  reward.append(model_mean_reward_before)
-    #  std.append(model_std_reward_before)
+    reward.append(model_mean_reward_before)
+    std.append(model_std_reward_before)
 
     my_file = open(file, "w+")
     with open(file, "a") as myfile:
@@ -873,7 +876,7 @@ if __name__ == "__main__":
                 "================================================================================================\n\n"
             )
 
-        if curriculum: #and EPOCH % CURR_INC == 0: #and EPOCH > 1:
+        if curriculum and EPOCH % CURR_INC == 0 and EPOCH > 1:
             curric_idx += 1
 
             meta_model.initial_experience = False

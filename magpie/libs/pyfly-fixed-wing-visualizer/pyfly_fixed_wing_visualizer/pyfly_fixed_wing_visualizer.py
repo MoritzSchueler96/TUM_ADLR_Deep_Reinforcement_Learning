@@ -43,6 +43,9 @@ class simrecorder:
         self.wind_n = np.zeros(simduration)
         self.wind_e = np.zeros(simduration)
         self.wind_d = np.zeros(simduration)
+        self.t_p_d = np.zeros(simduration)
+        self.t_p_e = np.zeros(simduration)
+        self.t_p_n = np.zeros(simduration)
 
     def reset(self, simduration=None):
         """
@@ -69,21 +72,30 @@ class simrecorder:
         self.roll = np.zeros(simduration)
         self.pitch = np.zeros(simduration)
         self.yaw = np.zeros(simduration)
+        self.t_p_d = np.zeros(simduration)
+        self.t_p_e = np.zeros(simduration)
+        self.t_p_n = np.zeros(simduration)
 
-    def savestate(self, state, idd):
+    def savestate(self, state, idd, goal = None):
         """
         This function is called every step of the simulation
         and passed simulation object as well as the current simulation step
         """
         self.res_n[idd] = state["position_n"].value
         self.res_e[idd] = state["position_e"].value
-        self.res_d[idd] = state["position_d"].value
+        self.res_d[idd] = -state["position_d"].value
         self.wind_n[idd] = state["wind_n"].value
         self.wind_e[idd] = state["wind_e"].value
         self.wind_d[idd] = state["wind_d"].value
         self.roll[idd] = state["roll"].value
         self.pitch[idd] = state["pitch"].value
         self.yaw[idd] = state["yaw"].value
+
+        if goal is not None:
+            self.t_p_d[idd] = -goal['position_d']
+            self.t_p_e[idd] = goal['position_e']
+            self.t_p_n[idd] = goal['position_n']
+
 
         self.simpb.update(1)  # Update progressbar
 
@@ -134,11 +146,6 @@ class simrecorder:
             ]
         )
 
-    def set_traj(self, trajectory):
-        #[{'Va': 13.5, 'pitch': 0.0, 'position_d': 107.4, 'position_e': 6.2, 'position_n': 8.3, 'roll': 7.4}]
-        self.t_p_d = trajectory['position_d'][0]
-        self.t_p_e = trajectory['position_e'][0]
-        self.t_p_n = trajectory['position_n'][0]
 
 
     def plot(self, rotate=180, interval=10, render="notebook", epoch=None):
@@ -306,32 +313,33 @@ class simrecorder:
         import numpy as np
 
         self.pb.update(1)
+        skip = False
 
-        if num == 0:
+        if num == 0 or (self.t_p_n[num] != self.t_p_n[num-1]) or (self.t_p_d[num] != self.t_p_d[num-1]) or (self.t_p_e[num] != self.t_p_e[num-1]):
 
             print(self.trajectory)
+            if num == 0:
+                self.trajectory[0].set_data(
+                    [dataLines[0][0], self.t_p_n[num]],
+                    [dataLines[1][0], self.t_p_e[num]],
+                )
 
-            self.trajectory[0].set_data(
-                [dataLines[0][0], self.t_p_n],
-                [dataLines[1][0], self.t_p_e,],
-            )
+                self.trajectory[0].set_3d_properties([dataLines[2][0], self.t_p_d[num]])
+            
+            else:
+                self.ax.collections.pop()  ##remove prior plane
+                self.ax.collections.pop()  ##remove prior wind
+                skip = True
+                self.trajectory[0].set_data(
+                    [self.t_p_n[num-1], self.t_p_n[num]],
+                    [self.t_p_e[num-1], self.t_p_e[num]],
+                )
 
-            self.trajectory[0].set_3d_properties([dataLines[2][0], self.t_p_d])
-
-#            drone = np.dot(self.eulerAnglesToRotationMatrix([0, 0, 0]), self.drone)
-#            self.ax.plot_trisurf(
-#                drone[0] + dataLines[0][0] + 100,
-#                drone[2] + dataLines[1][num],
-#                self.triangles,
-#                drone[1] + dataLines[2][-1],
-#                shade=True,
-#                alpha=0.5,
-#                color="green",
-#            )
+                self.trajectory[0].set_3d_properties([self.t_p_d[num]-1, self.t_p_d[num]])
 
         for line in lines:
 
-            if len(self.ax.collections) and num > 0:
+            if (len(self.ax.collections) and num > 0 and not skip):
                 self.ax.collections.pop()  ##remove prior plane
                 self.ax.collections.pop()  ##remove prior wind
             #    if num ==1:
