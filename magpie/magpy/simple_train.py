@@ -58,6 +58,7 @@ modelDir = "models/"
 ########################################################################################################################################################
 
 import time
+from stable_baselines3.common import logger  # to log curriculum level
 from stable_baselines3.common.logger import Image
 from stable_baselines3.common.callbacks import BaseCallback
 
@@ -338,7 +339,8 @@ class FixedWingAircraft_simple(gym.Env):
         for f in files:
             task = np.load(os.path.join(taskDir, f), allow_pickle=True)
             tasks.append(task)
-
+        for file in files:
+            print(file)
         return tasks
 
     def sample_task(self, id):
@@ -353,6 +355,7 @@ class FixedWingAircraft_simple(gym.Env):
         return self.tasks[id]
 
     def sample_target(self, id, pos):
+        print(id, pos)
         start = self.tasks[id][pos].copy()
         self.simulator.reset(state=start)
         goal = self.tasks[id][pos + 1].copy()
@@ -365,7 +368,10 @@ class FixedWingAircraft_simple(gym.Env):
     def reset_task(self, idx):
         self.cur_pos = 0
         self.idx = idx
+        print("PEARL WANTs:", idx)
         self._task, _ = self.sample_target(idx, 0)
+
+        print(len(self._task))
 
     def seed(self, seed=None):
         """
@@ -396,14 +402,6 @@ class FixedWingAircraft_simple(gym.Env):
         # self.simulator.turbulence_intensity = "light"
 
         obs = self.get_observation()
-        self.history = {
-            "action": [],
-            "reward": [],
-            "observation": [obs],
-            "target": {k: [v] for k, v in self._task[0].items()},
-            "error": [],  # {k: [self._get_error(k)] for k in self.target.keys()},
-            "goal": {k: [0] for k in self.rwd_vec},
-        }
 
         print("--reset--")
 
@@ -425,7 +423,18 @@ class FixedWingAircraft_simple(gym.Env):
         # action[2] = abs(action[2])
 
         if not self.skip:
-            if self.simulator.cur_sim_step == 0:
+            if self.steps_count == 0:  # self.simulator.cur_sim_step == 0:
+
+                obs = self.get_observation()
+                self.history = {
+                    "action": [],
+                    "reward": [],
+                    "observation": [obs],
+                    "target": {k: [v] for k, v in self._task[0].items()},
+                    "error": [],  # {k: [self._get_error(k)] for k in self.target.keys()},
+                    "goal": {k: [0] for k in self.rwd_vec},
+                }
+
                 self.rec = simrecorder(self.steps_max)
                 self.rec.set_traj(self.history["target"])
 
@@ -450,13 +459,6 @@ class FixedWingAircraft_simple(gym.Env):
             goal_achieved_on_step = False
             goal_status = []
 
-            # save current state for visualization with pyfly fixed wing visualizer
-            if not self.skip:
-                if self.rec:  # and self.steps_count % 50 == 0:
-                    self.rec.savestate(
-                        self.simulator.state, self.simulator.cur_sim_step - 1
-                    )
-
             for state, status in self._get_goal_status().items():
                 self.history["goal"][state].append(status)
                 goal_status.append(status)
@@ -466,11 +468,18 @@ class FixedWingAircraft_simple(gym.Env):
                 self.history["target"][state].append(status)
                 # self.history["error"][state].append(self._get_error(status)) # get error?
 
+            # save current state for visualization with pyfly fixed wing visualizer
+            if not self.skip:
+                if self.rec:  # and self.steps_count % 50 == 0:
+                    self.rec.savestate(
+                        self.simulator.state, self.steps_count - 1, self.target
+                    )
+
             if all(goal_status):
                 goal_achieved_on_step = True
-                self.sample_task(self.idx + 1)
+                self.sample_task(self.idx)  # + 1)
                 self.goal_achieved = True
-                done = True
+                # done = True #otherwise new sim is started
 
             # calculate reward  TODO: move down to get observation and appending?
             reward = self.get_reward(
@@ -624,7 +633,7 @@ class FixedWingAircraft_simple(gym.Env):
             ax.plot(x, y)
 
             # plot targets
-            self.simulator.render(close=close, targets=targets, viewer=self.viewer)
+            #           self.simulator.render(close=close, targets=targets, viewer=self.viewer)
 
             # save figures if specified
             if save_path is not None:
@@ -666,7 +675,7 @@ class FixedWingAircraft_simple(gym.Env):
         # idea on how to calc reward without scaling
         rew = 0
         for num, name in enumerate(self.rwd_vec):
-            dist = self._get_error(name)
+            dist = np.abs(self._get_error(name))
             dist = self.scale_reward(name, dist)
             rew += self.rwd_weights[num] * dist
 
@@ -741,8 +750,13 @@ if __name__ == "__main__":
     ##############
     ## Settings ##
     N_EPOCHS = 30
-    N_TRAINTASKS = 1
-    N_TESTTASKS = 1
+    N_TRAINTASKS = 50
+    N_TESTTASKS = 15
+
+    curriculum = True
+    curric_idx = 0
+    curric_paths = ["easy", "medium"]  # , "hard", "extreme", "ludicrous"]
+    CURR_INC = 15
     ##############
 
     modelname = "Msac__" + datetime.datetime.now().strftime("%H_%M%p__%B_%d_%Y")
@@ -800,10 +814,6 @@ if __name__ == "__main__":
     reward = []
     std = []
 
-    curriculum = False
-    curric_idx = 0
-    curric_paths = ["easy", "medium", "hard", "extreme", "ludicrous"]
-
     print("-Start-")
     if meta:
         save_model(meta_model, modelDir + modelname)
@@ -820,8 +830,8 @@ if __name__ == "__main__":
         pass
     #        model_mean_reward_before, model_std_reward_before = evaluate_policy(model, env, n_eval_episodes=n_eval)
 
-    #  reward.append(model_mean_reward_before)
-    #  std.append(model_std_reward_before)
+    reward.append(model_mean_reward_before)
+    std.append(model_std_reward_before)
 
     my_file = open(file, "w+")
     with open(file, "a") as myfile:
@@ -835,7 +845,11 @@ if __name__ == "__main__":
     print(
         "##################################Start Learning##################################"
     )
+
     for EPOCH in range(N_EPOCHS):
+
+        logger.record(key="train/curriculum_level", value=curric_idx)
+
         if meta:
             meta_model.learn(
                 total_timesteps=5 * 500,
@@ -871,8 +885,12 @@ if __name__ == "__main__":
                 "================================================================================================\n\n"
             )
 
-        if curriculum and EPOCH % 10 == 0 and EPOCH > 1:
-            # every 10 Epochs crank up the difficulty
+        if curriculum and EPOCH % CURR_INC == 0 and EPOCH > 1:
+            curric_idx += 1
+
+            meta_model.initial_experience = False
+            meta_model.reset_buffers()
+
             env = VecNormalize(
                 SubprocVecEnv(
                     [
@@ -890,7 +908,6 @@ if __name__ == "__main__":
                     ]
                 )
             )
-            curric_idx += 1
 
             if meta:
                 meta_model.env = env
