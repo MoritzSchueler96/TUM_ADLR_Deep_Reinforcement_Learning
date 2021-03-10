@@ -54,8 +54,8 @@ def evaluate_policy(
             action, state = model.predict(obs, state=state, deterministic=deterministic)
             obs, reward, done, _info = env.step(action)
             episode_reward += reward
-            if callback is not None:
-                callback(locals(), globals())
+#            if callback is not None:
+#                callback(locals(), globals())
             episode_length += 1
             if render:
                 env.render()
@@ -140,10 +140,10 @@ def evaluate_meta_policy(
 
                 model.JUST_EVAL.reset()
 
-                while num_transitions < 1500:
+                while num_transitions < 1500 and num_trajs <= 3:
                     num = model.obtain_samples(
                         deterministic=True,
-                        max_samples=1500 - num_transitions,
+                        max_samples=500 ,#- num_transitions,
                         max_trajs=1,
                         accum_context=True,
                         replaybuffers=[model.JUST_EVAL],
@@ -158,6 +158,7 @@ def evaluate_meta_policy(
                 total_episodes += 1
 
     #env.env_method("render", mode="other", epoch=epoch)
+    #tg = env.get_attr('target')
     env.env_method("set_skip", True)
 
     std_reward = np.std(episode_rewards) if total_episodes > 0 else 0.0

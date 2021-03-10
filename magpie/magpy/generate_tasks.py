@@ -209,13 +209,13 @@ fix_start_dir = True
 start_dir = [1, 0, 0]
 
 fix_velocity = True  # if magnitude of velocity should be kept
-use_wind = False
+use_wind = True
 fix_wind = True
 
 precision = 10  # precision for random values
 dist = 10  # distance between current coord and coord in same dir
 alpha = 0  # angle to edge of cutting circle (0-90 degrees)
-task_difficulty = "easy"
+task_difficulty = "hard"
 
 plot = False
 save = True

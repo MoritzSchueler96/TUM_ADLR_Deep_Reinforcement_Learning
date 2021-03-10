@@ -65,7 +65,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 # global variables
 render_interval = 500  # Time in seconds between rendering of training episodes
-tb_image_send_interval = 1000
+tb_image_send_interval = 99999999
 test_interval = 500000
 last_test = 0
 last_render = time.time()
@@ -744,8 +744,8 @@ if __name__ == "__main__":
 
     curriculum = True
     curric_idx = 0
-    curric_paths = ["easy", "medium"]#, "hard", "extreme", "ludicrous"]
-    CURR_INC = 15
+    curric_paths = ["easy", "medium", "hard", "hard","hard"]#, "hard", "extreme", "ludicrous"]
+    CURR_INC = 1
     ##############
 
     modelname = "Msac__" + datetime.datetime.now().strftime("%H_%M%p__%B_%d_%Y")
@@ -793,7 +793,7 @@ if __name__ == "__main__":
         meta_model.callback = cb
     else:
         meta = False
-        model = PPO(
+        model = SAC(
             "MlpPolicy",
             env,
             verbose=1,
@@ -818,8 +818,8 @@ if __name__ == "__main__":
             meta_model, env, n_eval_episodes=N_TESTTASKS, epoch=0
         )
     else:
-        pass
-    #        model_mean_reward_before, model_std_reward_before = evaluate_policy(model, env, n_eval_episodes=n_eval)
+        model.callback = cllbck
+        model_mean_reward_before, model_std_reward_before = evaluate_policy(model, env, n_eval_episodes=N_TESTTASKS)
 
     reward.append(model_mean_reward_before)
     std.append(model_std_reward_before)
@@ -852,9 +852,12 @@ if __name__ == "__main__":
             )
 
         else:
+
+            model.callback = cllbck
+
             model.learn(
                 total_timesteps=5 * 500,
-                callback=TensorboardCallback(),  # FIX creates new tb file each time called
+                callback=cllbck,#TensorboardCallback(),  # FIX creates new tb file each time called
             )  # , eval_freq=100, n_eval_episodes=5, log_interval = 100)
 
             model_mean_reward, model_std_reward = evaluate_policy(
@@ -876,11 +879,13 @@ if __name__ == "__main__":
                 "================================================================================================\n\n"
             )
 
-        if curriculum and EPOCH % CURR_INC == 0 and EPOCH > 1:
+        if curriculum and EPOCH % CURR_INC == 0 and EPOCH >= 1:
             curric_idx += 1
 
-            meta_model.initial_experience = False
-            meta_model.reset_buffers()
+            if meta:
+
+                meta_model.initial_experience = False
+                meta_model.reset_buffers()
 
             env = VecNormalize(
                 SubprocVecEnv(
@@ -905,8 +910,10 @@ if __name__ == "__main__":
                 meta_model.env = env
             else:
                 model.env = env
-
-        save_model(meta_model, modelDir + modelname)
+        if meta:
+            save_model(meta_model, modelDir + modelname)
+        else:
+            save_model(model, modelDir + modelname)
     # env.close()
 
 

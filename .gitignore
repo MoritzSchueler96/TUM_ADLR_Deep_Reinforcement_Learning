@@ -11,7 +11,8 @@ __pycache__/
 
 # Models
 magpie/magpy/models/*
-
+magpie/magpy/tasks/*
+magpie/magpy/temp/*
 # Distribution / packaging
 .Python
 build/

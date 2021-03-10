@@ -213,7 +213,7 @@ class MetaOffPolicyAlgorithm(BaseAlgorithm):
         self.update_post_train = 1
         self.num_iterations = 500
         self.num_tasks_sample = 5
-        self.max_path_length = 1500
+        self.max_path_length = 500
         self.train_tasks = 5
         self.meta_batch = 16
         self._n_train_steps_total = 0
@@ -306,6 +306,35 @@ class MetaOffPolicyAlgorithm(BaseAlgorithm):
 
         return super()._setup_learn(
             total_timesteps, eval_env, callback, eval_freq, n_eval_episodes, log_path, reset_num_timesteps, tb_log_name
+        )
+
+    def reset_buffers(self):
+        #needed for curriculum learning
+        for i in range(self.n_traintasks):
+            self.RBList_replay[i] = ReplayBuffer(
+            self.buffer_size,
+            self.observation_space,
+            self.action_space,
+            self.device,
+            optimize_memory_usage=self.optimize_memory_usage,
+        )
+        
+        for i in range(self.n_traintasks):
+            self.RBList_encoder[i] = ReplayBuffer(
+            self.buffer_size,
+            self.observation_space,
+            self.action_space,
+            self.device,
+            optimize_memory_usage=self.optimize_memory_usage,
+        )
+        
+        for i in range(self.n_evaltasks):
+            self.RBList_eval[i] = ReplayBuffer(
+            self.buffer_size,
+            self.observation_space,
+            self.action_space,
+            self.device,
+            optimize_memory_usage=self.optimize_memory_usage,
         )
 
     def learn(
@@ -593,9 +622,13 @@ class MetaOffPolicyAlgorithm(BaseAlgorithm):
                 # Select action randomly or according to policy
                 a, agent_info = self.actor.get_action(th.Tensor(o).reshape(-1,1,1))
 
-                #disable for mujoco:
-                
+                #log z:
+                z_dict = {}
+                for i,z_i in enumerate(self.actor.z.detach().numpy()[0]):
+                    logger.record(key = "info/current_z_"+str(i), value=z_i)
+#z_dict["z_"+str(i)] = z_i
 
+                
                 # Rescale and perform action
                 next_o, reward, done, infos = env.step([a])
                 if accum_context:

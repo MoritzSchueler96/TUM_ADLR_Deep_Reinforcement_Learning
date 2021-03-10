@@ -243,7 +243,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
         total_timesteps, callback = self._setup_learn(
             total_timesteps, eval_env, callback, eval_freq, n_eval_episodes, eval_log_path, reset_num_timesteps, tb_log_name
         )
-
+        callback = self.callback
         callback.on_training_start(locals(), globals())
 
         while self.num_timesteps < total_timesteps:
@@ -461,9 +461,9 @@ class OffPolicyAlgorithm(BaseAlgorithm):
                     action_noise.reset()
 
                 # Log training infos
-                if log_interval is not None and self._episode_num % log_interval == 0:
-                    self._dump_logs()
-
+                #if log_interval is not None and self._episode_num % log_interval == 0:
+                   # self._dump_logs()
+                self._dump_logs()
         mean_reward = np.mean(episode_rewards) if total_episodes > 0 else 0.0
 
         callback.on_rollout_end()
