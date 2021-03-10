@@ -63,8 +63,8 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 
 # global variables
-render_interval = 500  # Time in seconds between rendering of training episodes
-tb_image_send_interval = 1000
+render_interval = 1000  # Time in seconds between rendering of training episodes
+tb_image_send_interval = 10000
 test_interval = 500000
 last_test = 0
 last_render = time.time()
@@ -319,7 +319,7 @@ class FixedWingAircraft_simple(gym.Env):
             del goal_position[vel]
 
         Va = np.linalg.norm(Va)
-        #goal_position["Va"] = Va
+        # goal_position["Va"] = Va
 
         unwanted_vars = set(goal_position.keys()) - set(self.rwd_vec)
         for unwanted_key in unwanted_vars:
@@ -342,7 +342,7 @@ class FixedWingAircraft_simple(gym.Env):
         return tasks
 
     def sample_task(self, id):
-        if id == self.idx and self.cur_pos < len(self.tasks[id]):
+        if id == self.idx and self.cur_pos < len(self.tasks[id]) - 1:
             self.cur_pos += 1
         elif id == self.idx:
             self.cur_pos = 0
@@ -363,6 +363,8 @@ class FixedWingAircraft_simple(gym.Env):
         return range(len(self.tasks))
 
     def reset_task(self, idx):
+        self.cur_pos = 0
+        self.idx = idx
         self._task, _ = self.sample_target(idx, 0)
 
     def seed(self, seed=None):
@@ -425,7 +427,7 @@ class FixedWingAircraft_simple(gym.Env):
         if not self.skip:
             if self.simulator.cur_sim_step == 0:
                 self.rec = simrecorder(self.steps_max)
-                self.rec.set_traj(self.history['target'])
+                self.rec.set_traj(self.history["target"])
 
         control_input = list(action)
 
@@ -577,6 +579,21 @@ class FixedWingAircraft_simple(gym.Env):
                 for k, v in self.history["target"].items()  # change with history
             }
 
+            # targets should only include roll, pitch and Va
+            def calc_Va(targets):
+                Va = []
+                for i in range(len(targets["velocity_u"])):
+                    Vs = []
+                    for k in ["velocity_u", "velocity_v", "velocity_w"]:
+                        Vs.append(targets[k][i])
+                    Va.append(np.linalg.norm(Vs))
+
+            t = {}
+            t["roll"] = targets["roll"]
+            t["pitch"] = targets["pitch"]
+            t["Va"] = calc_Va(self.history["target"])
+            targets = t
+
             # create figure
             self.viewer = {"fig": plt.figure(figsize=(9, 16))}
 
@@ -586,7 +603,7 @@ class FixedWingAircraft_simple(gym.Env):
             self.viewer["gs"] = matplotlib.gridspec.GridSpec(subfig_count, 1)
 
             # plot actions
-            labels = self.act_vec
+            labels = ["elevator", "aileron", "throttle"]
             x, y = (
                 list(range(len(self.history["action"]))),
                 np.array(
