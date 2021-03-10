@@ -344,7 +344,7 @@ class FixedWingAircraft_simple(gym.Env):
         return tasks
 
     def sample_task(self, id):
-        if id == self.idx and self.cur_pos < len(self.tasks[id]) - 1:
+        if id == self.idx and self.cur_pos < len(self.tasks[id]) - 2:
             self.cur_pos += 1
         elif id == self.idx:
             self.cur_pos = 0
@@ -436,7 +436,7 @@ class FixedWingAircraft_simple(gym.Env):
                 }
 
                 self.rec = simrecorder(self.steps_max)
-                self.rec.set_traj(self.history["target"])
+                # self.rec.set_traj(self.history["target"])
 
         control_input = list(action)
 
