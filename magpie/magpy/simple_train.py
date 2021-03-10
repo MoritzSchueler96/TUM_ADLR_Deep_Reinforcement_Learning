@@ -588,6 +588,7 @@ class FixedWingAircraft_simple(gym.Env):
                 for k, v in self.history["target"].items()  # change with history
             }
 
+            # TODO: Refactor history to get rid of calculating this
             # targets should only include roll, pitch and Va
             def calc_Va(targets):
                 Va = []
@@ -596,6 +597,7 @@ class FixedWingAircraft_simple(gym.Env):
                     for k in ["velocity_u", "velocity_v", "velocity_w"]:
                         Vs.append(targets[k][i])
                     Va.append(np.linalg.norm(Vs))
+                return Va
 
             t = {}
             t["roll"] = targets["roll"]
