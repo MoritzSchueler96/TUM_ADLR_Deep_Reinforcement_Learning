@@ -64,8 +64,8 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 
 # global variables
-render_interval = 500  # Time in seconds between rendering of training episodes
-tb_image_send_interval = 99999999
+render_interval = 1000  # Time in seconds between rendering of training episodes
+tb_image_send_interval = 10000
 test_interval = 500000
 last_test = 0
 last_render = time.time()
@@ -344,7 +344,7 @@ class FixedWingAircraft_simple(gym.Env):
         return tasks
 
     def sample_task(self, id):
-        if id == self.idx and self.cur_pos < len(self.tasks[id])-2:
+        if id == self.idx and self.cur_pos < len(self.tasks[id]) - 2:
             self.cur_pos += 1
         elif id == self.idx:
             self.cur_pos = 0
@@ -366,9 +366,9 @@ class FixedWingAircraft_simple(gym.Env):
         return range(len(self.tasks))
 
     def reset_task(self, idx):
-        print('PEARL WANTs:', idx)
-        self.idx = idx
         self.cur_pos = 0
+        self.idx = idx
+        print("PEARL WANTs:", idx)
         self._task, _ = self.sample_target(idx, 0)
 
         print(len(self._task))
@@ -393,14 +393,14 @@ class FixedWingAircraft_simple(gym.Env):
         self.steps_count = 0
 
         self.simulator = PyFly(
-                    os.path.join(configDir, "pyfly_config.json"),
-                    os.path.join(configDir, "x8_param.mat"),
-                )
+            os.path.join(configDir, "pyfly_config.json"),
+            os.path.join(configDir, "x8_param.mat"),
+        )
 
         self.reset_task(self.idx)  # or 0?
         # self.simulator.turbulence = True
         # self.simulator.turbulence_intensity = "light"
-        
+
         obs = self.get_observation()
 
         print("--reset--")
@@ -423,7 +423,7 @@ class FixedWingAircraft_simple(gym.Env):
         # action[2] = abs(action[2])
 
         if not self.skip:
-            if self.steps_count == 0: #self.simulator.cur_sim_step == 0:
+            if self.steps_count == 0:  # self.simulator.cur_sim_step == 0:
 
                 obs = self.get_observation()
                 self.history = {
@@ -461,8 +461,8 @@ class FixedWingAircraft_simple(gym.Env):
 
             
             for state, status in self._get_goal_status().items():
-                            self.history["goal"][state].append(status)
-                            goal_status.append(status)
+                self.history["goal"][state].append(status)
+                goal_status.append(status)
 
             for state, status in self._task[self.cur_pos + 1].items():
                 self.target[state] = status
@@ -481,9 +481,9 @@ class FixedWingAircraft_simple(gym.Env):
 
             if all(goal_status):
                 goal_achieved_on_step = True
-                self.sample_task(self.idx)# + 1)
+                self.sample_task(self.idx)  # + 1)
                 self.goal_achieved = True
-                #done = True #otherwise new sim is started
+                # done = True #otherwise new sim is started
 
             # calculate reward  TODO: move down to get observation and appending?
             reward = self.get_reward(
@@ -592,6 +592,21 @@ class FixedWingAircraft_simple(gym.Env):
                 for k, v in self.history["target"].items()  # change with history
             }
 
+            # targets should only include roll, pitch and Va
+            def calc_Va(targets):
+                Va = []
+                for i in range(len(targets["velocity_u"])):
+                    Vs = []
+                    for k in ["velocity_u", "velocity_v", "velocity_w"]:
+                        Vs.append(targets[k][i])
+                    Va.append(np.linalg.norm(Vs))
+
+            t = {}
+            t["roll"] = targets["roll"]
+            t["pitch"] = targets["pitch"]
+            t["Va"] = calc_Va(self.history["target"])
+            targets = t
+
             # create figure
             self.viewer = {"fig": plt.figure(figsize=(9, 16))}
 
@@ -601,7 +616,7 @@ class FixedWingAircraft_simple(gym.Env):
             self.viewer["gs"] = matplotlib.gridspec.GridSpec(subfig_count, 1)
 
             # plot actions
-            labels = self.act_vec
+            labels = ["elevator", "aileron", "throttle"]
             x, y = (
                 list(range(len(self.history["action"]))),
                 np.array(
@@ -622,7 +637,7 @@ class FixedWingAircraft_simple(gym.Env):
             ax.plot(x, y)
 
             # plot targets
- #           self.simulator.render(close=close, targets=targets, viewer=self.viewer)
+            #           self.simulator.render(close=close, targets=targets, viewer=self.viewer)
 
             # save figures if specified
             if save_path is not None:
